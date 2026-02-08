@@ -490,7 +490,7 @@ CommandBrain is released under the MIT License - free for educational use and mo
 ## 🙏 Credits & Acknowledgments
 
 **Created by Joshua Sears**  
-Cybersecurity Instructor | Game & Web Development Background
+Supplemental Instructor | Game & Web Development Background
 
 **Project Goal:** Reduce student dropout rates by making Linux tools approachable
 
