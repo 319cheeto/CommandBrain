@@ -1,0 +1,13 @@
+# CommandBrain Requirements
+# This tool uses only Python standard library modules
+# Minimum Python version: 3.6 (for f-strings and type hints)
+
+# No external dependencies required!
+# All functionality uses built-in modules:
+# - sqlite3 (database)
+# - argparse (CLI)
+# - os, sys (system operations)
+# - re (regex for parsing)
+# - typing (type hints)
+# - platform (OS detection)
+# - ctypes (Windows color support)

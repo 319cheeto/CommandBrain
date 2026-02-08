@@ -1,0 +1,44 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+test_venv/
+.venv/
+commandbrain_env/
+
+# Database files (users will create their own)
+*.db
+.commandbrain.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Temporary test files
+cb
+cb.bat
+cb.py
+
+# User-specific files
+.env
+.config
