@@ -117,7 +117,14 @@ echo ""
 
 echo "[4/7] Setting up database..."
 if ! commandbrain-setup; then
-    echo 7] Enabling purpose-based search..."
+    echo -e "${RED}ERROR: Database setup failed${NC}"
+    echo "Try running manually: commandbrain-setup"
+    exit 1
+fi
+echo -e "${GREEN}✓ Database created with ~30 essential Linux commands!${NC}"
+echo ""
+
+echo "[5/7] Enabling purpose-based search..."
 echo ""
 echo "Adding student-friendly slang terms (brute force, network scan, etc.)"
 if python3 enhance_slang_tags.py > /dev/null 2>&1; then
@@ -142,8 +149,13 @@ if [[ "$KALI" == "y" ]] || [[ "$KALI" == "Y" ]]; then
         echo -e "${GREEN}Kali tools added!${NC}"
     else
         echo -e "${YELLOW}⚠️  Kali tools installation had issues (check above)${NC}"
-    fi PROFESSIONALS and PENTESTERS only."
+    fi
+else
+    echo ""
+    echo "Skipping Kali tools. You can add them later with: commandbrain-kali"
+fi
 echo ""
+
 echo "[7/7] Configuring shell PATH..."
 if [[ -n "$VENV_PATH" ]]; then
     SHELL_RC=""
