@@ -58,6 +58,11 @@ install_windows.bat
 
 **Linux/Mac/WSL:**
 ```bash
+bash install_linux.sh
+```
+
+**Alternative (if above doesn't work):**
+```bash
 chmod +x install_linux.sh
 ./install_linux.sh
 ```
