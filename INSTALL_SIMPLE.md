@@ -69,6 +69,18 @@ chmod +x install_linux.sh
 ./install_linux.sh
 ```
 
+**Note:** `chmod +x` makes the file executable (runnable). You only do this once.
+
+**If you get "Permission denied":**
+```bash
+# Try with sudo:
+sudo chmod +x install_linux.sh
+./install_linux.sh
+
+# Or run it with bash directly:
+bash install_linux.sh
+```
+
 Wait for it to finish. It will ask about Kali tools - type `n` if you're not sure.
 
 ### Step 3: Reload your terminal

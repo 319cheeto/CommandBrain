@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/319cheeto/CommandBrain.git
 cd CommandBrain
-chmod +x install_linux.sh
+chmod +x install_linux.sh test_cb.sh
 ./install_linux.sh
 ```
 
@@ -14,6 +14,11 @@ chmod +x install_linux.sh
 source ~/.bashrc    # Option A: Reload terminal NOW (faster)
 ```
 **OR** just close and reopen your terminal (Option B - simpler)
+
+**If chmod fails, try:**
+```bash
+bash install_linux.sh    # Run with bash directly
+```
 
 **Why is this needed?**
 - The installer adds `cb` to your terminal's PATH
