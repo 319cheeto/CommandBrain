@@ -24,6 +24,12 @@ Perfect for intro cybersecurity classes where students are overwhelmed by hundre
 
 ## 📥 **EASY INSTALLATION**
 
+### **🚀 FASTEST WAY - For Students Who Just Want It To Work**
+
+**See: [INSTALL_SIMPLE.md](INSTALL_SIMPLE.md) - Dead simple, step-by-step with pictures!**
+
+---
+
 ### **Prerequisites:**
 - **Python 3.6+** (usually pre-installed on Kali/Linux)
 - **Git** (optional - or download ZIP)
@@ -33,7 +39,7 @@ Perfect for intro cybersecurity classes where students are overwhelmed by hundre
 sudo apt update && sudo apt install -y git
 ```
 
-### **Super Easy (One-Click Install)**
+### **Quick Install (One-Click)**
 
 **Step 1: Get the code**
 ```bash
@@ -41,7 +47,7 @@ git clone https://github.com/319cheeto/CommandBrain.git
 cd CommandBrain
 ```
 
-**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip) and extract it
+**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip), extract it, and rename the folder to `CommandBrain`
 
 **Step 2: Run the installer**
 
@@ -56,11 +62,17 @@ chmod +x install_linux.sh
 ./install_linux.sh
 ```
 
-**Step 3: ⚠️ IMPORTANT - Activate the changes**
-```bash
-source ~/.bashrc    # Reload your terminal settings
-```
-**OR** just close and reopen your terminal!
+**Step 3: ⚠️ IMPORTANT - Reload Your Terminal**
+
+**Linux/Mac users:** Your terminal needs to reload its settings.
+
+**Pick ONE:**
+- **Option A:** Run this command: `source ~/.bashrc` (fast)
+- **Option B:** Close and reopen your terminal (simpler)
+
+**Windows users:** Just open a NEW Command Prompt window.
+
+**What does this do?** It tells your terminal where to find the `cb` command. You only do this ONCE after installation!
 
 **Step 4: Test it works!**
 ```bash
@@ -69,22 +81,31 @@ cb password cracking  # Search by purpose!
 ```
 
 If you see command info, **YOU'RE DONE!** 🎉  
-If you see "command not found", go back to Step 3.
+If you see "command not found", go back to Step 3 (you forgot to reload!).
 
 ---
 
 ### **✅ How to Know Installation Worked**
 
-Run these verification tests:
-
+**Quick test:**
 ```bash
-cb --help          # Should show help text
-cb ssh             # Should show SSH command details  
-cb --all           # Should list all available commands
+cb ssh             # Should show SSH command details
+```
+
+**Run automatic tests:**
+```bash
+# Windows:
+test_cb.bat
+
+# Linux/Mac:
+chmod +x test_cb.sh
+./test_cb.sh
 ```
 
 **✓ Success:** You see command information and examples  
-**✗ Failed:** "command not found" error → Run: `source ~/.bashrc`
+**✗ Failed:** "command not found" error
+  - **Linux/Mac:** Run `source ~/.bashrc` or close/reopen terminal
+  - **Windows:** Open a NEW Command Prompt window
 
 ---
 
@@ -500,6 +521,123 @@ Priority list to expand:
 - Quiz mode (random command, guess what it does)
 - Difficulty ratings (beginner/intermediate/advanced)
 - Cheat sheet generator (export category to PDF)
+
+---
+
+## ❓ Frequently Asked Questions (Students)
+
+### Installation Questions
+
+**Q: Do I type "cb" or "commandbrain"?**  
+**A:** Both work! `cb` is shorter and easier - use that. They do exactly the same thing.
+
+**Q: Where do I type these commands?**  
+**A:** In your terminal (Linux/Mac) or Command Prompt (Windows). NOT in your browser or a text editor!
+
+**Q: Do I need to be in the CommandBrain folder to use it?**  
+**A:** NO! After installation, `cb` works from anywhere. That's the whole point!
+
+**Q: What if I get "command not found"?**  
+**A:** 
+- **Linux/Mac:** Did you run `source ~/.bashrc` or close/reopen terminal? (You must do this ONCE after install)
+- **Windows:** Did you open a NEW Command Prompt? (Old windows won't see the new command)
+- **Still broken?** Run `test_cb.bat` (Windows) or `./test_cb.sh` (Linux) to diagnose
+
+**Q: Do I need internet to use CommandBrain?**  
+**A:** NO! It works completely offline after installation. Perfect for exams and labs without internet.
+
+**Q: Should I add Kali tools during installation?**  
+**A:** 
+- **YES** if you're taking a cybersecurity/pentesting course
+- **NO** if you're just learning basic Linux commands
+- **Don't worry** - you can add them later with: `commandbrain-kali`
+
+**Q: What does "source ~/.bashrc" mean? Why do I need it?**  
+**A:** 
+- Your terminal reads settings from `.bashrc` when it starts
+- The installer added CommandBrain's location to that file
+- "source" tells your terminal to re-read that file RIGHT NOW
+- Without this, you'd have to close and reopen your terminal
+- You only do it ONCE after installation!
+
+### Usage Questions
+
+**Q: How do I search for a command?**  
+**A:** Just type `cb` followed by what you want to do:
+```bash
+cb ssh                 # Find SSH command
+cb find files          # Search by purpose
+cb password crack      # Multi-word search
+```
+
+**Q: What's the difference between `cb ssh` and `cb search ssh`?**  
+**A:** No difference! The word "search" is optional. `cb ssh` automatically searches.
+
+**Q: Can I search by what a command DOES instead of its name?**  
+**A:** YES! That's the main feature!
+```bash
+cb brute force      # Finds hydra, john, etc.
+cb network scan     # Finds nmap, masscan
+cb sniffing         # Finds wireshark, tcpdump
+```
+
+**Q: How do I see examples for a command?**  
+**A:** Use the `-d` (detailed) flag:
+```bash
+cb -d ssh          # Shows examples and detailed info
+```
+
+**Q: How do I list all available commands?**  
+**A:**
+```bash
+cb --all           # List everything
+cb --list          # Show categories
+```
+
+### Troubleshooting Questions
+
+**Q: I installed it, but `cb` still doesn't work!**  
+**A:** Run the test script:
+- Windows: `test_cb.bat`
+- Linux/Mac: `chmod +x test_cb.sh && ./test_cb.sh`
+
+This will tell you exactly what's wrong.
+
+**Q: Can I use this on Windows?**  
+**A:** YES! It works on Windows, Linux, Mac, and WSL.
+
+**Q: It says "Database not found" - what do I do?**  
+**A:** Run the setup:
+```bash
+commandbrain-setup
+```
+Or just run the installer again: `install_windows.bat` or `./install_linux.sh`
+
+**Q: How do I update CommandBrain?**  
+**A:**
+```bash
+# Windows:
+update_windows.bat
+
+# Linux/Mac:
+./update_linux.sh
+```
+
+**Q: How do I uninstall it?**  
+**A:**
+```bash
+# Windows:
+uninstall_windows.bat
+
+# Linux/Mac:
+./uninstall_linux.sh
+```
+
+**Q: Can I add my own commands?**  
+**A:** YES! See [INSTRUCTOR_GUIDE.md](INSTRUCTOR_GUIDE.md) for how to customize it for your course.
+
+**Q: This is cool! Can I contribute?**  
+**A:** YES! Open an issue or pull request on GitHub: https://github.com/319cheeto/CommandBrain
 
 ---
 

@@ -7,10 +7,20 @@ git clone https://github.com/319cheeto/CommandBrain.git
 cd CommandBrain
 chmod +x install_linux.sh
 ./install_linux.sh
-source ~/.bashrc    # This reloads your terminal - IMPORTANT!
 ```
 
-**What's "source ~/.bashrc"?** It reloads your terminal settings so the `cb` command works. You only do this ONCE after installation. Or just close and reopen your terminal instead!
+**IMPORTANT NEXT STEP - Pick ONE:**
+```bash
+source ~/.bashrc    # Option A: Reload terminal NOW (faster)
+```
+**OR** just close and reopen your terminal (Option B - simpler)
+
+**Why is this needed?**
+- The installer adds `cb` to your terminal's PATH
+- Your terminal only reads its settings when it starts
+- "source ~/.bashrc" forces it to re-read settings NOW
+- Without this, the `cb` command won't work until you restart terminal
+- You only do this ONCE after installation!
 
 ## Test It Works
 

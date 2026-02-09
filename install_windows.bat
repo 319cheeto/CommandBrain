@@ -60,9 +60,26 @@ echo [2/4] Installing CommandBrain...
 pip install -e .
 if errorlevel 1 (
     echo ERROR: Installation failed
+    echo.
+    echo This might be because:
+    echo   - pip is not installed
+    echo   - Python Scripts folder is not in PATH
+    echo.
+    echo Try running: python -m pip install -e .
+    echo.
     pause
     exit /b 1
 )
+echo.
+echo Ensuring Python Scripts is in your PATH...
+python -c "import sys, os; print(os.path.dirname(sys.executable) + '\\Scripts')" > temp_path.txt
+set /p SCRIPTS_PATH=<temp_path.txt
+del temp_path.txt
+echo Python Scripts folder: %SCRIPTS_PATH%
+echo.
+echo NOTE: If 'cb' doesn't work after install, you may need to:
+echo   1. Close and reopen Command Prompt
+echo   2. Or restart your computer
 echo.
 
 echo [3/4] Setting up database...
@@ -106,14 +123,34 @@ echo ========================================
 echo Installation Complete!
 echo ========================================
 echo.
-echo You now have the 'cb' command available!
+echo IMPORTANT FINAL STEP:
+echo ========================================
 echo.
-echo Try it out:
+echo CLOSE THIS WINDOW and open a NEW Command Prompt.
+echo.
+echo The 'cb' command will NOT work in this window!
+echo It only works in NEW windows.
+echo.
+echo ========================================
+echo After opening a new window, try:
+echo ========================================
+echo.
 echo   cb ssh                    # Search for ssh
-echo   cb network monitoring     # Multi-word search  
+echo   cb find files             # Multi-word search  
 echo   cb -d grep                # Detailed view
-echo   cb --list                 # List categories
+echo   cb --help                 # Show all options
 echo.
-echo It's that simple! Just type: cb ANYTHING
+echo ========================================
+echo To test if it worked:
+echo ========================================
+echo.
+echo   test_cb.bat               # Run automatic tests
+echo.
+echo ========================================
+echo.
+echo If 'cb' doesn't work:
+echo   - Did you open a NEW Command Prompt?
+echo   - Try restarting your computer
+echo   - Run test_cb.bat for diagnosis
 echo.
 pause

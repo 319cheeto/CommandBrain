@@ -27,12 +27,16 @@ commandbrain search ssh
 
 **Example terminal session:**
 ```bash
-user@laptop:~$ cd command_search_tool
-user@laptop:~/command_search_tool$ pip install -e .
+user@laptop:~$ git clone https://github.com/319cheeto/CommandBrain.git
+user@laptop:~$ cd CommandBrain
+user@laptop:~/CommandBrain$ pip install -e .
 Successfully installed commandbrain
-user@laptop:~/command_search_tool$ commandbrain-setup
-✓ Setup Complete!
-user@laptop:~/command_search_tool$ commandbrain search ssh
+user@laptop:~/CommandBrain$ commandbrain-setup
+\u2713 Setup Complete!
+user@laptop:~/CommandBrain$ python3 enhance_slang_tags.py
+\u2713 Slang tags enhanced!
+user@laptop:~/CommandBrain$ source ~/.bashrc
+user@laptop:~/CommandBrain$ cb ssh
 Found 1 command(s):
 ssh [Security]
   Secure Shell - remote login protocol
@@ -43,28 +47,37 @@ ssh [Security]
 **What you'll type in PowerShell or CMD:**
 
 ```powershell
-# Step 1: Navigate to the commandbrain directory
-cd command_search_tool
+# Step 1: Get the code (if using git)
+git clone https://github.com/319cheeto/CommandBrain.git
+cd CommandBrain
 
 # Step 2: Install using pip
 # The dot (.) means "install from current directory"
 pip install -e .
 
 # Step 3: Run setup
-# No filename needed - this is now a global command!
 commandbrain-setup
 
-# Step 4: (Optional) Add Kali tools
+# Step 4: Enable purpose-based search
+python enhance_slang_tags.py
+
+# Step 5: (Optional) Add Kali tools
 commandbrain-kali
 
-# Step 5: Start using it!
-commandbrain search ssh
+# Step 6: Close this window and open a NEW Command Prompt
+
+# Step 7: Start using it!
+cb ssh
 ``` 1: One-Click Installers
 
-### Windows One-Click
+###CommandBrain
 
-**What you'll type:**
-```powershell
+# Run the installer (just the filename, no extra commands!)
+install_windows.bat
+
+# After it finishes, CLOSE this window
+# Open a NEW Command Prompt
+# Then test: cb ssh
 # Navigate to the folder
 cd command_search_tool
 
@@ -74,8 +87,8 @@ install_windows.bat
 
 **Example:**
 ```powershell
-PS C:\Users\joshu> cd command_search_tool
-PS C:\Users\joshu\command_search_tool> install_windows.bat
+PS C:\Users\Student> cd CommandBrain
+PS C:\Users\Student\CommandBrain> install_windows.bat
 ========================================
 CommandBrain Windows Installer
 ========================================
@@ -84,6 +97,13 @@ CommandBrain Windows Installer
 [3/4] Setting up database...
 [4/4] Add Kali security tools? (y/n): n
 Installation Complete!
+
+CLOSE THIS WINDOW and open a NEW Command Prompt.
+PS C:\Users\Student\CommandBrain> exit
+
+[Open new Command Prompt]
+PS C:\Users\Student> cb ssh
+[Shows SSH command info]
 ```
 
 ### Linux/Mac One-Click
@@ -91,22 +111,58 @@ Installation Complete!
 **What you'll type:**
 ```bash
 # Navigate to the folder
-cd command_search_tool
+cd CommandBrain
 
 # Make the script executable (first time only)
 chmod +x install_linux.sh
 
-# Run the installer (just the filename with ./)
+# Run the installer
+./install_linux.sh
+
+# Reload your shell (IMPORTANT!)
+source ~/.bashrc
+
+# Or just close and reopen your terminal
+# Then test: cb ssh
+```
+
+**Example:**
+```bash
+user@laptop:~$ cd CommandBrain
+user@laptop:~/CommandBrain$ chmod +x install_linux.sh
+user@laptop:~/CommandBrain$ ./install_linux.sh
+========================================
+CommandBrain Linux/Mac Installer
+========================================
+[Installing...]
+Installation Complete!
+user@laptop:~/CommandBrain$ source ~/.bashrc
+user@laptop:~/CommandBrain$ cb ssh
+[Shows SSH command info]
+```
+
+---
+
+## Method 2: Manual Install (If One-Click Fails)
+
+### Windows Manual Install
+
 **What you'll type:**
 ```powershell
 # Navigate to the folder
-cd command_search_tool
+cd CommandBrain
 
 # Run setup (include "python" and the filename)
 python setup_commandbrain.py
 
-# Now use it (must include "python" and full filename)
-python commandbrain.py search network
+# Enable slang search
+python enhance_slang_tags.py
+
+# Now use it
+python commandbrain.py search ssh
+
+# Or use the ultra-short wrapper
+cb ssh
 ```
 
 **Example PowerShell session:**

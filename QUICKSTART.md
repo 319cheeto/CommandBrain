@@ -7,16 +7,18 @@
 ### 🎯 **EASIEST - One-Click Install**
 
 **On Windows:**
-1. Open Command Prompt or PowerShell
-2. Navigate to this folder:
+1. Download and extract CommandBrain to your Documents folder
+2. Open Command Prompt (Start → type "cmd" → Enter)
+3. Navigate to the folder:
    ```powershell
-   cd c:\Users\joshu\OneDrive\Documents\GitHub\command_search_tool
+   cd Documents\CommandBrain
    ```
-3. Run the installer:
+4. Run the installer:
    ```powershell
    install_windows.bat
    ```
-4. Done! Skip to Step 2.
+5. Open a NEW Command Prompt window (close the old one)
+6. Done! Skip to Step 2.
 
 **On Linux/Mac/WSL:**
 1. Clone the repository:
@@ -38,10 +40,14 @@
 Works on all platforms (Windows, Linux, Mac, WSL):
 
 ```bash
-# From inside the command_search_tool folder:
+# From inside the CommandBrain folder:
 pip install -e .
 commandbrain-setup
+python enhance_slang_tags.py
 ```
+
+**Linux/Mac:** Run `source ~/.bashrc` or close/reopen terminal
+**Windows:** Open a NEW Command Prompt window
 
 Done! Skip to Step 2.
 
