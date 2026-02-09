@@ -13,7 +13,44 @@
 
 ## 🔴 HIGH PRIORITY - Core Functionality
 
-### 1. Enhance Slang/Purpose Search
+### 1. Command Chaining Helper ⭐ NEW TOP PRIORITY
+**Goal:** Show students how to chain commands together for complete workflows
+
+**Why this matters:**
+- Students know individual tools but don't know how to combine them
+- Real pentesting = chaining multiple commands
+- "How do I go from finding a host to getting a shell?"
+
+**Examples students need:**
+```bash
+# Network reconnaissance workflow
+nmap -sn 192.168.1.0/24          # Find live hosts
+nmap -sV -p- <target>             # Scan all ports on target
+searchsploit <service version>    # Find exploits
+
+# Web application testing workflow  
+nikto -h http://target.com        # Scan for vulnerabilities
+dirb http://target.com            # Find hidden directories
+sqlmap -u "http://target.com?id=1" # Test for SQL injection
+
+# Password attack workflow
+nmap -p 22 192.168.1.0/24        # Find SSH servers
+hydra -L users.txt -P pass.txt ssh://target  # Brute force
+john --wordlist=rockyou.txt hash.txt         # Crack captured hash
+```
+
+**Implementation ideas:**
+- [ ] Add "workflows" or "chains" field to database
+- [ ] New flag: `cb --workflow web-pentest`
+- [ ] Show step-by-step with explanations
+- [ ] Include "what you're looking for" in each step
+- [ ] Add common pitfalls/warnings
+
+**Status:** READY TO BUILD
+
+---
+
+### 2. Enhance Slang/Purpose Search
 **Goal:** Students type what they're trying to DO, not technical names
 
 **Examples that MUST work:**
@@ -44,7 +81,7 @@
 
 ---
 
-### 2. Test Purpose-Based Search
+### 3. Test Purpose-Based Search
 **Verify these work NOW (before enhancement):**
 ```bash
 cb password cracking    # Should find hydra, john, hashcat
@@ -62,11 +99,57 @@ cb network scan         # Should find nmap
 
 ## 🟡 MEDIUM PRIORITY - Student Experience
 
-### 3. Standalone Windows .exe
+### 4. Alias Support ⬆️ MOVED UP
+**Goal:** Let students create their own shortcuts for common searches
+
+**Why this matters:**
+- Students develop their own vocabulary
+- Some say "pwn", others say "exploit"
+- Personalization = better retention
+
+**Implementation:**
+```bash
+# Student creates personal shortcuts
+cb --alias pwcrack "password cracking"
+cb --alias webscan "web vulnerability scan"
+cb --alias findhost "network discovery"
+
+# Later they just type:
+cb pwcrack        # Searches for "password cracking"
+cb webscan        # Searches for "web vulnerability scan"
+```
+
+**Technical approach:**
+- [ ] Store aliases in `~/.commandbrain_aliases.json`
+- [ ] Check aliases first before database search
+- [ ] Allow listing/removing aliases
+- [ ] Share aliases between students (optional)
+
+**Commands to add:**
+- `cb --alias <shortcut> "<search term>"`
+- `cb --list-aliases`
+- `cb --remove-alias <shortcut>`
+
+**Status:** READY TO BUILD AFTER COMMAND CHAINING
+6. "Learning Paths" / Use Case Guides
+**Goal:** Group commands by attack scenarios (Similar to command chaining but more educational)
+
+**Examples:**
+- "How do I hack a website?" → Shows workflow: recon → scan → exploit
+- "Password attack workflow" → nmap → hydra → john
+- "Post-exploitation" → Show privilege escalation tools
+
+**Status:** Future enhancement (overlaps with command chaining)
+
+---
+
+## 🟢 LOW PRIORITY - Nice to Have
+
+### 7. Standalone Windows .exe ⬇️ MOVED DOWN
 **Goal:** Zero-friction installation for Windows students
 
-**Status:** Not started  
-**Priority:** High (after slang/purpose enhancement)
+**Status:** Not started - Works fine as-is with bat installer
+**Priority:** Low (current installation already works well)
 
 **Implementation:**
 - [ ] Use PyInstaller to create .exe
@@ -80,31 +163,13 @@ cb network scan         # Should find nmap
 pyinstaller --onefile --name cb commandbrain.py
 ```
 
----
+**No9. Offline Help System
+- Add `cb --help-topic <topic>` 
+- Mini tutorials on common tasks
 
-### 4. Slang Term Contribution System
-**Goal:** Let students add their own slang terms
-
-**Ideas:**
-- `cb --add-slang hydra "pw crack"`
-- Crowd-source slang from students
-- Instructor can review/approve
-
-**Status:** Future enhancement
-
----
-
-### 5. "Learning Paths" / Use Case Guides
-**Goal:** Group commands by attack scenarios
-
-**Examples:**
-- "How do I hack a website?" → Shows workflow: recon → scan → exploit
-- "Password attack workflow" → nmap → hydra → john
-- "Post-exploitation" → Show privilege escalation tools
-
-**Status:** Future enhancement
-
----
+### 10. Export to Flashcards
+- `cb --export-flashcards`
+- Students can study command purposes
 
 ## 🟢 LOW PRIORITY - Nice to Have
 
@@ -158,37 +223,90 @@ cb brute force
 cb web scanning
 cb network monitoring
 ```
+Build Command Chaining Helper ⭐ TOP PRIORITY
+**This is THE game-changer for students!**
 
-**If results are good:** Document it as working  
-**If results are poor:** Prioritize slang enhancement
+**Why first:**
+- Students know tools but don't know workflows
+- Bridges gap between theory and practice
+- Real-world skills > memorizing commands
 
-### Step 2: Add Slang Terms to Database (If needed)
-- Review existing tags in setup_commandbrain.py
-- Add informal terms to each command
-- Test with student language
+**Implementation plan:**
+1. Design the workflow data structure
+2. Add workflow examples to database
+3. Create `cb --chain <workflow-name>` command
+4. Test with common pentesting scenarios
+5. Get student feedback
 
-### Step 3: Create Standalone .exe
-- Makes Windows installation trivial
-- Big student adoption boost
-
-### Step 4: Student Testing
-- Get feedback from your graduate
-- Identify missing slang terms
-- Refine based on real usage
+**DO NOT PUSH until thoroughly tested!**
 
 ---
 
-## 🎓 STUDENT ADOPTION METRICS TO TRACK
+### Step 2: Enhance Slang/Purpose Search
+**Make sure students can find commands naturally**
 
-1. **Discoverability:** Can students find commands by PURPOSE?
-2. **Speed:** Is it faster than Google?
-3. **Typo tolerance:** Does fuzzy search catch mistakes?
+**Test these searches:**
+```bash
+cb password cracking
+cb brute force
+cb web scanning
+cb network monitoring
+cb sniffing
+cb exploit
+```
+
+**If results are poor:**
+- Add more slang terms to tags
+- Review student language patterns
+- Test with actual student queries
+
+**DO NOT PUSH until thoroughly tested!**
+
+---
+
+### Step 3: Add Alias Support
+**Let students personalize their experience**
+
+**After command chaining and slang work well:**
+- Implement alias storage
+- Test alias creation/listing/removal
+- Make sure aliases don't conflict with real commands
+
+---
+
+### Step 4: Student Testing & Iteration
+- Get feedback from graduate students
+- Watch them use it (don't coach!)
+- Identify pain points
+- Refine based on real usage
+
+**Success metric: Do they actually use it instead of Google?**fuzzy search catch mistakes?
 4. **Examples quality:** Are examples actionable?
 5. **Installation friction:** Can they install in <5 minutes?
 
 ---
 
 ## 💡 INSTRUCTOR FEATURES (Future)
+
+---
+
+## 🎯 CURRENT FOCUS (Updated Priorities)
+
+**Week 1-2: Command Chaining Helper**
+- This is the breakthrough feature
+- Shows complete workflows, not just individual tools
+- Test extensively before pushing!
+
+**Week 3: Slang Enhancement** 
+- Make sure purpose-based search is rock solid
+- Test with real student language
+- No pushing until verified!
+
+**Week 4: Alias Support**
+- Personal shortcuts for each student
+- Build on solid foundation
+
+**REMEMBER: We're changing how students learn cybersecurity. Quality over speed!** 🚀
 
 - Analytics: What are students searching for?
 - Custom command sets per class/assignment
