@@ -24,13 +24,24 @@ Perfect for intro cybersecurity classes where students are overwhelmed by hundre
 
 ## 📥 **EASY INSTALLATION**
 
+### **Prerequisites:**
+- **Python 3.6+** (usually pre-installed on Kali/Linux)
+- **Git** (optional - or download ZIP)
+
+**Don't have git?** Install it:
+```bash
+sudo apt update && sudo apt install -y git
+```
+
 ### **Super Easy (One-Click Install)**
 
 **Step 1: Get the code**
 ```bash
-git clone https://github.com/YourUsername/CommandBrain.git
-cd CommandBrain
+git clone https://github.com/319cheeto/CommandBrain.git
+cd command_search_tool
 ```
+
+**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip) and extract it instead!
 
 **Step 2: Run the installer**
 
@@ -41,16 +52,52 @@ install_windows.bat
 
 **Linux/Mac/WSL:**
 ```bash
+chmod +x install_linux.sh
 ./install_linux.sh
 ```
 
-**Step 3: Done!**
+**Step 3: ⚠️ IMPORTANT - Activate the changes**
 ```bash
-cb ssh                # Try it!
+source ~/.bashrc    # Reload your terminal settings
+```
+**OR** just close and reopen your terminal!
+
+**Step 4: Test it works!**
+```bash
+cb ssh                # Should show SSH command info
 cb password cracking  # Search by purpose!
 ```
 
-The installer automatically:
+If you see command info, **YOU'RE DONE!** 🎉  
+If you see "command not found", go back to Step 3.
+
+---
+
+### **✅ How to Know Installation Worked**
+
+Run these verification tests:
+
+```bash
+cb --help          # Should show help text
+cb ssh             # Should show SSH command details  
+cb --all           # Should list all available commands
+```
+
+**✓ Success:** You see command information and examples  
+**✗ Failed:** "command not found" error → Run: `source ~/.bashrc`
+
+---
+
+**⚠️ Installation Issues on Kali Linux?**
+- See [KALI_QUICKSTART.md](KALI_QUICKSTART.md) for a quick one-page guide
+- See [KALI_INSTALL_FIX.md](KALI_INSTALL_FIX.md) for detailed troubleshooting
+- Run `./test_install.sh` for automated diagnostics
+
+---
+
+### **📦 What You Get:**
+
+**The installer automatically:**
 - ✅ Checks Python installation
 - ✅ Sets up virtual environment (Linux)
 - ✅ Installs CommandBrain
@@ -58,7 +105,7 @@ The installer automatically:
 - ✅ **Adds student-friendly slang terms** (brute force, network scan, etc.)
 - ✅ Asks if you want Kali security tools (optional)
 
-**📦 What You Get:**
+**Included commands:**
 - ✅ **~30 Core Linux Commands** (included by default)
   - File management: ls, cd, cp, mv, rm, etc.
   - Networking: ssh, ping, netstat, ip, etc.

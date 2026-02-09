@@ -16,13 +16,13 @@ CommandBrain is distributed as a complete package containing all Python modules,
 ### Installation Instructions:
 ```bash
 # For Windows (Command Prompt or PowerShell):
-git clone https://github.com/YOUR_USERNAME/commandbrain.git
-cd commandbrain
+git clone https://github.com/319cheeto/CommandBrain.git
+cd command_search_tool
 install_windows.bat
 
 # For Linux/Mac/WSL:
-git clone https://github.com/YOUR_USERNAME/commandbrain.git
-cd commandbrain
+git clone https://github.com/319cheeto/CommandBrain.git
+cd command_search_tool
 chmod +x install_linux.sh
 ./install_linux.sh
 ```

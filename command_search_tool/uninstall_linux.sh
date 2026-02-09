@@ -41,19 +41,37 @@ else
 fi
 
 # Remove PATH entry from shell configs
-for SHELL_RC in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+for SHELL_RC in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.bash_profile"; do
     if [ -f "$SHELL_RC" ]; then
         # Check if the file has CommandBrain entries
         if grep -q "commandbrain" "$SHELL_RC"; then
             # Create backup
-            cp "$SHELL_RC" "${SHELL_RC}.backup"
-            # Remove CommandBrain lines
-            sed -i '/# CommandBrain/d' "$SHELL_RC"
-            sed -i '/commandbrain_env/d' "$SHELL_RC"
+            cp "$SHELL_RC" "${SHELL_RC}.backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+            # Remove CommandBrain lines (compatible with both GNU and BSD sed)
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS
+                sed -i '' '/# CommandBrain/d' "$SHELL_RC"
+                sed -i '' '/commandbrain_env/d' "$SHELL_RC"
+            else
+                # Linux
+                sed -i '/# CommandBrain/d' "$SHELL_RC"
+                sed -i '/commandbrain_env/d' "$SHELL_RC"
+            fi
             echo "✓ Removed PATH entry from $(basename $SHELL_RC)"
         fi
     fi
 done
+
+# Remove any leftover pip package metadata
+echo ""
+echo "Removing pip package metadata..."
+pip3 uninstall -y commandbrain 2>/dev/null || true
+
+# Remove egg-info directory if it exists in current dir
+if [ -d "commandbrain.egg-info" ]; then
+    rm -rf commandbrain.egg-info
+    echo "✓ Removed egg-info directory"
+fi
 
 echo ""
 echo "========================================"

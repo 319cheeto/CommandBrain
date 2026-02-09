@@ -1,5 +1,11 @@
 # CommandBrain Troubleshooting Guide
 
+> **🚀 Quick Fix for Kali Linux Users:** See [KALI_INSTALL_FIX.md](KALI_INSTALL_FIX.md) for Kali-specific solutions!
+
+> **🔍 Automated Diagnostics:** Run `./test_install.sh` to automatically test your installation!
+
+---
+
 ## Commands Not Found After Installation
 
 ### Symptom
