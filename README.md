@@ -38,10 +38,10 @@ sudo apt update && sudo apt install -y git
 **Step 1: Get the code**
 ```bash
 git clone https://github.com/319cheeto/CommandBrain.git
-cd command_search_tool
+cd CommandBrain
 ```
 
-**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip) and extract it instead!
+**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip) and extract it
 
 **Step 2: Run the installer**
 

@@ -3,7 +3,8 @@
 ## Installation (4 Commands)
 
 ```bash
-cd command_search_tool
+git clone https://github.com/319cheeto/CommandBrain.git
+cd CommandBrain
 chmod +x install_linux.sh
 ./install_linux.sh
 source ~/.bashrc    # This reloads your terminal - IMPORTANT!

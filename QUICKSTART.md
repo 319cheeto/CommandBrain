@@ -19,12 +19,12 @@
 4. Done! Skip to Step 2.
 
 **On Linux/Mac/WSL:**
-1. Open Terminal
-2. Navigate to this folder:
+1. Clone the repository:
    ```bash
-   cd ~/path/to/command_search_tool
+   git clone https://github.com/319cheeto/CommandBrain.git
+   cd CommandBrain
    ```
-3. Make installer executable and run it:
+2. Make installer executable and run it:
    ```bash
    chmod +x install_linux.sh
    ./install_linux.sh

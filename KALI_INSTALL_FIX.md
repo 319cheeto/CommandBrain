@@ -5,10 +5,8 @@
 ### The 3-Step Fix (Works 95% of the Time)
 
 ```bash
-# Step 1: Navigate to where you cloned/downloaded the tool
-cd command_search_tool
-# Or if you cloned to your home directory:
-cd ~/command_search_tool
+# Step 1: Navigate to where you cloned the repository
+cd CommandBrain
 
 # Step 1.5: Complete uninstall
 ./uninstall_linux.sh
