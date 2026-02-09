@@ -42,3 +42,8 @@ cb.py
 # User-specific files
 .env
 .config
+
+# Session context (local development notes - never push!)
+SESSION_CONTEXT.md
+*_NOTES.md
+*_CONTEXT.md
