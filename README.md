@@ -47,7 +47,9 @@ git clone https://github.com/319cheeto/CommandBrain.git
 cd CommandBrain
 ```
 
-**💡 Don't have git?** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip), extract it, and rename the folder to `CommandBrain`
+**💡 Don't have git?** 
+- **Install it:** See [GIT_GUIDE.md](GIT_GUIDE.md) for easy git installation
+- **Or download ZIP:** [Download ZIP](https://github.com/319cheeto/CommandBrain/archive/refs/heads/master.zip), extract it, and rename the folder to `CommandBrain`
 
 **Step 2: Run the installer**
 
@@ -617,7 +619,13 @@ This will tell you exactly what's wrong.
 commandbrain-setup
 ```
 Or just run the installer again: `install_windows.bat` or `./install_linux.sh`
+ Super easy with git! See [GIT_GUIDE.md](GIT_GUIDE.md) for details.
+```bash
+cd CommandBrain
+git pull
+```
 
+Or use the update scripts:
 **Q: How do I update CommandBrain?**  
 **A:**
 ```bash
