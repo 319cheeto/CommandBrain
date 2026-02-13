@@ -18,6 +18,11 @@ import platform
 import difflib
 from typing import List, Tuple
 
+try:
+    import workflows
+except ImportError:
+    workflows = None  # Workflows feature not available
+
 # Enable ANSI colors on Windows
 if platform.system() == 'Windows':
     try:
@@ -535,6 +540,80 @@ def show_stats():
     finally:
         conn.close()
 
+def list_workflows():
+    """Display all available command chains/workflows."""
+    if workflows is None:
+        print(f"{Colors.RED}Command chaining feature not available.{Colors.END}")
+        return
+    
+    print(f"\n{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.END}")
+    print(f"{Colors.CYAN}║           AVAILABLE COMMAND CHAINS (WORKFLOWS)           ║{Colors.END}")
+    print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.END}\n")
+    
+    for workflow_id, workflow_data in workflows.WORKFLOWS.items():
+        print(f"\n{Colors.YELLOW}{Colors.BOLD}🔗 {workflow_id}{Colors.END}")
+        print(f"   Title: {workflow_data['name']}")
+        print(f"   {Colors.CYAN}Level: {workflow_data['difficulty']}{Colors.END}")
+        print(f"   {Colors.GREEN}Steps: {len(workflow_data['steps'])}{Colors.END}")
+        print(f"   Description: {workflow_data['description']}")
+    
+    print(f"\n{Colors.CYAN}💡 Usage: cb --chain <workflow-id>{Colors.END}")
+    print(f"{Colors.CYAN}   Example: cb --chain web-pentest{Colors.END}\n")
+
+def display_workflow(workflow_id):
+    """Display a complete step-by-step workflow."""
+    if workflows is None:
+        print(f"{Colors.RED}Command chaining feature not available.{Colors.END}")
+        return
+    
+    if workflow_id not in workflows.WORKFLOWS:
+        print(f"{Colors.RED}Workflow '{workflow_id}' not found.{Colors.END}")
+        print(f"{Colors.YELLOW}Use 'cb --list-chains' to see available workflows.{Colors.END}")
+        return
+    
+    workflow = workflows.WORKFLOWS[workflow_id]
+    
+    print(f"\n{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.END}")
+    workflow_title = workflow['name'].upper()
+    padding = (60 - len(workflow_title)) // 2
+    print(f"{Colors.CYAN}║{' ' * padding}{workflow_title}{' ' * (60 - len(workflow_title) - padding)}║{Colors.END}")
+    print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.END}\n")
+    
+    print(f"📋 Description: {workflow['description']}")
+    print(f"{Colors.CYAN}🎯 Level: {workflow['difficulty']}{Colors.END}")
+    print(f"{Colors.GREEN}📊 Total Steps: {len(workflow['steps'])}{Colors.END}\n")
+    
+    for step in workflow['steps']:
+        step_num = step['number']
+        print(f"\n{Colors.YELLOW}┌─ Step {step_num}: {step['title']}{Colors.END}")
+        print(f"{Colors.YELLOW}│{Colors.END}")
+        print(f"{Colors.YELLOW}│{Colors.END}  {Colors.CYAN}💻 Command:{Colors.END}")
+        print(f"{Colors.YELLOW}│{Colors.END}     {Colors.GREEN}{Colors.BOLD}{step['command']}{Colors.END}")
+        print(f"{Colors.YELLOW}│{Colors.END}")
+        print(f"{Colors.YELLOW}│{Colors.END}  🎯 Purpose: {step['purpose']}")
+        
+        if step.get('look_for'):
+            print(f"{Colors.YELLOW}│{Colors.END}")
+            print(f"{Colors.YELLOW}│{Colors.END}  {Colors.CYAN}👀 Look for:{Colors.END}")
+            for item in step['look_for']:
+                print(f"{Colors.YELLOW}│{Colors.END}     • {item}")
+        
+        if step.get('tips'):
+            print(f"{Colors.YELLOW}│{Colors.END}")
+            print(f"{Colors.YELLOW}│{Colors.END}  {Colors.HEADER}💡 Tips:{Colors.END}")
+            # Tips can be either a string or a list
+            tips = step['tips']
+            if isinstance(tips, str):
+                print(f"{Colors.YELLOW}│{Colors.END}     ✓ {tips}")
+            else:
+                for tip in tips:
+                    print(f"{Colors.YELLOW}│{Colors.END}     ✓ {tip}")
+        
+        print(f"{Colors.YELLOW}└{'─' * 58}{Colors.END}")
+    
+    print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Workflow complete! Remember to test in a safe, legal environment.{Colors.END}")
+    print(f"{Colors.CYAN}📚 Learn more about each command: cb <command-name>{Colors.END}\n")
+
 def main():
     parser = argparse.ArgumentParser(
         description="CommandBrain - Smart Linux Command Reference",
@@ -566,6 +645,10 @@ Examples:
                        help='Compare two commands side-by-side')
     parser.add_argument('--stats', action='store_true',
                        help='Show database statistics')
+    parser.add_argument('--chain', metavar='WORKFLOW',
+                       help='Show step-by-step command workflow/chain (e.g., web-pentest, network-recon)')
+    parser.add_argument('--list-chains', action='store_true',
+                       help='List all available command workflows/chains')
     
     # Search options (default action)
     parser.add_argument('query', nargs='*', 
@@ -582,7 +665,11 @@ Examples:
     args = parser.parse_args()
     
     # Handle special commands first
-    if args.list:
+    if args.list_chains:
+        list_workflows()
+    elif args.chain:
+        display_workflow(args.chain)
+    elif args.list:
         list_categories()
     elif args.add:
         add_command_interactive()
