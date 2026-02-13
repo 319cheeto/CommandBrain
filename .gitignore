@@ -43,7 +43,10 @@ cb.py
 .env
 .config
 
-# Session context (local development notes - never push!)
+# Session/memory files (personal notes - never push to GitHub!)
 SESSION_CONTEXT.md
+MEMORY.md
 *_NOTES.md
 *_CONTEXT.md
+# MEMORY.md is gitignored for privacy but backed up automatically by OneDrive.
+# If lost, check OneDrive recycle bin or version history.

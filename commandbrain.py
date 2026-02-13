@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 CommandBrain - Smart Command Reference Tool
-Search Linux commands by name, purpose, category, or related tools
+Search Linux commands by name, purpose, category, or related tools.
 
-ADHD-Friendly Features:
-- Instant search results
-- Color-coded output for easy scanning
-- Multiple search modes
-- Short and long format views
+Usage:  cb ssh                  Search for SSH
+        cb password cracking    Search by purpose/task
+        cb -d grep              Detailed view
+        cb -e nmap              Examples only
+        cb --setup              Initialize database
+        cb --setup --kali       Include Kali security tools
 """
 
 import sqlite3
@@ -16,684 +17,606 @@ import sys
 import argparse
 import platform
 import difflib
+import re
 from typing import List, Tuple
 
-try:
-    import workflows
-except ImportError:
-    workflows = None  # Workflows feature not available
+# ─────────────────────────────────────────────────────────────────────────────
+# COLOR SUPPORT - works on Bash, ZSH, Fish, and Windows Terminal
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Enable ANSI colors on Windows
-if platform.system() == 'Windows':
+def _supports_color():
+    """Detect if the terminal supports ANSI colors."""
+    # Respect NO_COLOR convention (https://no-color.org)
+    if os.environ.get("NO_COLOR") is not None:
+        return False
+    # Not a TTY (piped output) = no color
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        return False
+    # Dumb terminals don't support color
+    if os.environ.get("TERM") == "dumb":
+        return False
+    return True
+
+# Enable ANSI on Windows 10+
+if platform.system() == "Windows":
     try:
-        # Windows 10+ supports ANSI escape codes
         import ctypes
         kernel32 = ctypes.windll.kernel32
         kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
     except Exception:
-        pass  # Fallback to no colors on older Windows
+        pass
 
-# ANSI color codes for terminal output
+_USE_COLOR = _supports_color()
+
 class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m'
+    """ANSI color codes. Automatically disabled when terminal doesn't support them."""
+    HEADER    = '\033[95m' if _USE_COLOR else ''
+    BLUE      = '\033[94m' if _USE_COLOR else ''
+    CYAN      = '\033[96m' if _USE_COLOR else ''
+    GREEN     = '\033[92m' if _USE_COLOR else ''
+    YELLOW    = '\033[93m' if _USE_COLOR else ''
+    RED       = '\033[91m' if _USE_COLOR else ''
+    BOLD      = '\033[1m'  if _USE_COLOR else ''
+    UNDERLINE = '\033[4m'  if _USE_COLOR else ''
+    END       = '\033[0m'  if _USE_COLOR else ''
 
-def get_db_path():
-    """Get the database file path"""
-    return os.path.expanduser("~/.commandbrain.db")
+C = Colors  # Short alias used throughout
 
-def connect_db():
-    """Connect to the database"""
-    db_path = get_db_path()
-    if not os.path.exists(db_path):
-        print(f"{Colors.RED}Error: Database not found!{Colors.END}")
-        print(f"Run setup first: python3 setup_commandbrain.py")
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE
+# ─────────────────────────────────────────────────────────────────────────────
+
+DB_PATH = os.path.expanduser("~/.commandbrain.db")
+
+def _connect(must_exist=True):
+    """Return a connection to the SQLite database."""
+    if must_exist and not os.path.exists(DB_PATH):
+        print(f"{C.RED}Database not found! Run:  cb --setup{C.END}")
         sys.exit(1)
     try:
-        return sqlite3.connect(db_path)
+        return sqlite3.connect(DB_PATH)
     except sqlite3.Error as e:
-        print(f"{Colors.RED}Error connecting to database: {e}{Colors.END}")
+        print(f"{C.RED}Database error: {e}{C.END}")
         sys.exit(1)
 
-def get_all_command_names() -> List[str]:
-    """
-    Get all command names from the database for fuzzy matching
-    """
-    conn = connect_db()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("SELECT name FROM commands ORDER BY name")
-        names = [row[0] for row in cursor.fetchall()]
-        return names
-    except sqlite3.Error:
-        return []
-    finally:
-        conn.close()
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP  (replaces setup_commandbrain.py, add_kali_tools.py, enhance_slang_tags.py)
+# ─────────────────────────────────────────────────────────────────────────────
 
-def suggest_similar_commands(search_term: str, max_suggestions: int = 5) -> List[str]:
-    """
-    Suggest similar command names using fuzzy matching
-    Returns up to max_suggestions similar commands
-    """
-    all_commands = get_all_command_names()
-    if not all_commands:
-        return []
-    
-    # Use difflib to find close matches
-    # cutoff=0.6 means 60% similarity required
-    suggestions = difflib.get_close_matches(search_term, all_commands, n=max_suggestions, cutoff=0.6)
-    return suggestions
+def setup_database(include_kali=False):
+    """Create DB, populate commands, and apply slang tags. All-in-one setup."""
+    from data import BASIC_COMMANDS, KALI_TOOLS, SLANG_MAPPINGS
 
-def search_commands(search_term: str, search_type: str = "all") -> List[Tuple]:
-    """
-    Search for commands in the database
-    
-    search_type options:
-    - all: Search name, description, tags, related commands
-    - name: Search only command names
-    - category: Search by category
-    - tags: Search by tags
-    - description: Search in descriptions
-    """
-    conn = connect_db()
-    cursor = conn.cursor()
-    
-    search_pattern = f"%{search_term}%"
-    
-    if search_type == "name":
-        query = "SELECT * FROM commands WHERE name LIKE ? ORDER BY name"
-        cursor.execute(query, (search_pattern,))
-    
-    elif search_type == "category":
-        query = "SELECT * FROM commands WHERE category LIKE ? ORDER BY name"
-        cursor.execute(query, (search_pattern,))
-    
-    elif search_type == "tags":
-        query = "SELECT * FROM commands WHERE tags LIKE ? ORDER BY name"
-        cursor.execute(query, (search_pattern,))
-    
-    elif search_type == "description":
-        query = "SELECT * FROM commands WHERE description LIKE ? OR notes LIKE ? ORDER BY name"
-        cursor.execute(query, (search_pattern, search_pattern))
-    
-    else:  # "all"
-        query = """
-            SELECT * FROM commands 
-            WHERE name LIKE ? 
-               OR description LIKE ? 
-               OR tags LIKE ? 
-               OR related_commands LIKE ?
-               OR category LIKE ?
-            ORDER BY 
-                CASE 
-                    WHEN name LIKE ? THEN 1
-                    WHEN tags LIKE ? THEN 2
-                    ELSE 3
-                END,
-                name
-        """
-        cursor.execute(query, (search_pattern, search_pattern, search_pattern, 
-                               search_pattern, search_pattern, search_pattern, search_pattern))
-    
-    results = cursor.fetchall()
+    conn = _connect(must_exist=False)
+    cur = conn.cursor()
+
+    # Create schema
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            usage TEXT,
+            examples TEXT,
+            related_commands TEXT,
+            notes TEXT,
+            tags TEXT
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_name ON commands(name)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_category ON commands(category)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tags ON commands(tags)")
+
+    # Insert basic commands
+    cur.executemany("""
+        INSERT OR IGNORE INTO commands
+        (name,category,description,usage,examples,related_commands,notes,tags)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, BASIC_COMMANDS)
+    basic_count = len(BASIC_COMMANDS)
+
+    # Insert Kali tools
+    kali_count = 0
+    if include_kali:
+        cur.executemany("""
+            INSERT OR IGNORE INTO commands
+            (name,category,description,usage,examples,related_commands,notes,tags)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, KALI_TOOLS)
+        kali_count = len(KALI_TOOLS)
+
+    # Apply slang / purpose-based search terms
+    enhanced = 0
+    for cmd_name, slang_list in SLANG_MAPPINGS.items():
+        cur.execute("SELECT tags FROM commands WHERE name = ?", (cmd_name,))
+        row = cur.fetchone()
+        if not row:
+            continue
+        current = row[0] or ""
+        new_slang = ", ".join(slang_list)
+        combined = f"{current}, {new_slang}" if current else new_slang
+        cur.execute("UPDATE commands SET tags = ? WHERE name = ?", (combined, cmd_name))
+        enhanced += 1
+
+    conn.commit()
     conn.close()
-    
+
+    # Report
+    print(f"\n{C.BOLD}CommandBrain Setup Complete!{C.END}\n")
+    print(f"  Database:    {C.CYAN}{DB_PATH}{C.END}")
+    print(f"  Commands:    {C.CYAN}{basic_count} basic Linux commands{C.END}")
+    if include_kali:
+        print(f"  Kali tools:  {C.CYAN}{kali_count} security tools{C.END}")
+    print(f"  Search tags: {C.CYAN}{enhanced} commands enhanced with purpose-based search{C.END}")
+    print(f"\n  Try it:  {C.GREEN}cb ssh{C.END}")
+    print(f"           {C.GREEN}cb password cracking{C.END}")
+    if not include_kali:
+        print(f"\n  Want Kali tools?  {C.YELLOW}cb --setup --kali{C.END}")
+    print()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SEARCH
+# ─────────────────────────────────────────────────────────────────────────────
+
+def search_commands(term: str, mode: str = "all") -> List[Tuple]:
+    """Search commands. mode: all | name | category | tags | description"""
+    conn = _connect()
+    cur = conn.cursor()
+    p = f"%{term}%"
+
+    if mode == "name":
+        cur.execute("SELECT * FROM commands WHERE name LIKE ? ORDER BY name", (p,))
+    elif mode == "category":
+        cur.execute("SELECT * FROM commands WHERE category LIKE ? ORDER BY name", (p,))
+    elif mode == "tags":
+        cur.execute("SELECT * FROM commands WHERE tags LIKE ? ORDER BY name", (p,))
+    elif mode == "description":
+        cur.execute("SELECT * FROM commands WHERE description LIKE ? OR notes LIKE ? ORDER BY name", (p, p))
+    else:
+        cur.execute("""
+            SELECT * FROM commands
+            WHERE name LIKE ? OR description LIKE ? OR tags LIKE ?
+               OR related_commands LIKE ? OR category LIKE ?
+            ORDER BY
+                CASE WHEN name LIKE ? THEN 1 WHEN tags LIKE ? THEN 2 ELSE 3 END,
+                name
+        """, (p, p, p, p, p, p, p))
+
+    results = cur.fetchall()
+    conn.close()
     return results
 
-def display_short(results: List[Tuple], search_term: str = ""):
-    """Display results in short format (list view)"""
-    if not results:
-        print(f"{Colors.YELLOW}No commands found for '{search_term}'.{Colors.END}")
-        
-        # Suggest similar commands using fuzzy matching
-        if search_term:
-            suggestions = suggest_similar_commands(search_term)
-            if suggestions:
-                print(f"\n{Colors.CYAN}💡 Did you mean:{Colors.END}")
-                
-                # Get brief info for each suggestion
-                conn = connect_db()
-                cursor = conn.cursor()
-                for cmd in suggestions:
-                    cursor.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
-                    result = cursor.fetchone()
-                    if result:
-                        desc = result[0]
-                        # Truncate long descriptions
-                        if len(desc) > 60:
-                            desc = desc[:57] + "..."
-                        print(f"  {Colors.GREEN}{cmd}{Colors.END} - {desc}")
-                conn.close()
-                print(f"\n{Colors.BOLD}Try:{Colors.END} cb {suggestions[0]}")
-        return
-    
-    print(f"\n{Colors.BOLD}Found {len(results)} command(s):{Colors.END}\n")
-    
-    for row in results:
-        name = row[1]
-        category = row[2]
-        description = row[3]
-        
-        print(f"{Colors.CYAN}{Colors.BOLD}{name}{Colors.END} "
-              f"{Colors.YELLOW}[{category}]{Colors.END}")
-        print(f"  {description}")
-        print()
 
-def display_detailed(results: List[Tuple], search_term: str = ""):
-    """Display results in detailed format"""
-    if not results:
-        print(f"{Colors.YELLOW}No commands found for '{search_term}'.{Colors.END}")
-        
-        # Suggest similar commands using fuzzy matching
-        if search_term:
-            suggestions = suggest_similar_commands(search_term)
-            if suggestions:
-                print(f"\n{Colors.CYAN}💡 Did you mean:{Colors.END}")
-                
-                # Get brief info for each suggestion
-                conn = connect_db()
-                cursor = conn.cursor()
-                for cmd in suggestions:
-                    cursor.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
-                    result = cursor.fetchone()
-                    if result:
-                        desc = result[0]
-                        # Truncate long descriptions
-                        if len(desc) > 60:
-                            desc = desc[:57] + "..."
-                        print(f"  {Colors.GREEN}{cmd}{Colors.END} - {desc}")
-                conn.close()
-                print(f"\n{Colors.BOLD}Try:{Colors.END} cb {suggestions[0]}")
+def _suggest(term: str, limit: int = 5) -> List[str]:
+    """Fuzzy-match against all command names."""
+    conn = _connect()
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM commands ORDER BY name")
+    names = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return difflib.get_close_matches(term, names, n=limit, cutoff=0.6)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DISPLAY HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _print_no_results(term: str):
+    """Shared 'no results + did you mean?' block used by every display mode."""
+    print(f"{C.YELLOW}No commands found for '{term}'.{C.END}")
+    if not term:
         return
-    
-    print(f"\n{Colors.BOLD}Found {len(results)} command(s):{Colors.END}\n")
-    
-    for i, row in enumerate(results, 1):
+    suggestions = _suggest(term)
+    if not suggestions:
+        return
+    print(f"\n{C.CYAN}Did you mean:{C.END}")
+    conn = _connect()
+    cur = conn.cursor()
+    for cmd in suggestions:
+        cur.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
+        row = cur.fetchone()
+        if row:
+            desc = row[0][:57] + "..." if len(row[0]) > 60 else row[0]
+            print(f"  {C.GREEN}{cmd}{C.END} - {desc}")
+    conn.close()
+    print(f"\n{C.BOLD}Try:{C.END} cb {suggestions[0]}")
+
+
+def display_short(results: List[Tuple], term: str = ""):
+    """List view: name, category, one-liner."""
+    if not results:
+        return _print_no_results(term)
+    print(f"\n{C.BOLD}Found {len(results)} command(s):{C.END}\n")
+    for r in results:
+        print(f"{C.CYAN}{C.BOLD}{r[1]}{C.END} {C.YELLOW}[{r[2]}]{C.END}")
+        print(f"  {r[3]}\n")
+
+
+def display_detailed(results: List[Tuple], term: str = ""):
+    """Full info: description, usage, examples, notes, tags."""
+    if not results:
+        return _print_no_results(term)
+    print(f"\n{C.BOLD}Found {len(results)} command(s):{C.END}\n")
+    for i, r in enumerate(results, 1):
         if i > 1:
-            print(f"\n{Colors.BLUE}{'─' * 70}{Colors.END}\n")
-        
-        name = row[1]
-        category = row[2]
-        description = row[3]
-        usage = row[4]
-        examples = row[5]
-        related = row[6]
-        notes = row[7]
-        tags = row[8]
-        
-        # Command name and category
-        print(f"{Colors.CYAN}{Colors.BOLD}{name}{Colors.END} "
-              f"{Colors.YELLOW}[{category}]{Colors.END}")
-        print(f"{Colors.BOLD}Description:{Colors.END} {description}")
-        
-        # Usage
+            print(f"\n{C.BLUE}{'─' * 70}{C.END}\n")
+        name, cat, desc, usage, examples, related, notes, tags = r[1:9]
+        print(f"{C.CYAN}{C.BOLD}{name}{C.END} {C.YELLOW}[{cat}]{C.END}")
+        print(f"{C.BOLD}Description:{C.END} {desc}")
         if usage:
-            print(f"\n{Colors.BOLD}Usage:{Colors.END}")
-            print(f"  {usage}")
-        
-        # Examples
+            print(f"\n{C.BOLD}Usage:{C.END}\n  {usage}")
         if examples:
-            print(f"\n{Colors.BOLD}Examples:{Colors.END}")
-            for example in examples.split('\n'):
-                print(f"  {Colors.GREEN}${Colors.END} {example}")
-        
-        # Related commands
+            print(f"\n{C.BOLD}Examples:{C.END}")
+            for ex in examples.split('\n'):
+                print(f"  {C.GREEN}${C.END} {ex}")
         if related:
-            print(f"\n{Colors.BOLD}Related Commands:{Colors.END} {Colors.CYAN}{related}{Colors.END}")
-        
-        # Notes
+            print(f"\n{C.BOLD}Related:{C.END} {C.CYAN}{related}{C.END}")
         if notes:
-            print(f"\n{Colors.BOLD}Notes:{Colors.END}")
-            print(f"  💡 {notes}")
-        
-        # Tags
+            print(f"\n{C.BOLD}Notes:{C.END}\n  {notes}")
         if tags:
-            print(f"\n{Colors.BOLD}Tags:{Colors.END} {tags}")
+            print(f"\n{C.BOLD}Tags:{C.END} {tags}")
 
-def display_examples_only(results: List[Tuple], search_term: str = ""):
-    """Display only examples in a quick-reference format"""
+
+def display_examples(results: List[Tuple], term: str = ""):
+    """Quick-reference: just name + examples."""
     if not results:
-        print(f"{Colors.YELLOW}No commands found for '{search_term}'.{Colors.END}")
-        
-        # Suggest similar commands using fuzzy matching
-        if search_term:
-            suggestions = suggest_similar_commands(search_term)
-            if suggestions:
-                print(f"\n{Colors.CYAN}💡 Did you mean:{Colors.END}")
-                
-                # Get brief info for each suggestion
-                conn = connect_db()
-                cursor = conn.cursor()
-                for cmd in suggestions:
-                    cursor.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
-                    result = cursor.fetchone()
-                    if result:
-                        desc = result[0]
-                        # Truncate long descriptions
-                        if len(desc) > 60:
-                            desc = desc[:57] + "..."
-                        print(f"  {Colors.GREEN}{cmd}{Colors.END} - {desc}")
-                conn.close()
-                print(f"\n{Colors.BOLD}Try:{Colors.END} cb {suggestions[0]}")
-        return
-    
-    print(f"\n{Colors.BOLD}Examples for {len(results)} command(s):{Colors.END}\n")
-    
-    for i, row in enumerate(results, 1):
+        return _print_no_results(term)
+    print(f"\n{C.BOLD}Examples for {len(results)} command(s):{C.END}\n")
+    for i, r in enumerate(results, 1):
         if i > 1:
-            print(f"{Colors.BLUE}{'─' * 50}{Colors.END}\n")
-        
-        name = row[1]
-        examples = row[5]
-        usage = row[4]
-        
-        # Command name
-        print(f"{Colors.CYAN}{Colors.BOLD}{name}{Colors.END}")
-        
-        # Usage (brief)
-        if usage:
-            print(f"  {Colors.BOLD}Usage:{Colors.END} {usage}")
-        
-        # Examples (main focus)
-        if examples:
-            for example in examples.split('\n'):
-                if example.strip():
-                    print(f"  {Colors.GREEN}${Colors.END} {example}")
+            print(f"{C.BLUE}{'─' * 50}{C.END}\n")
+        print(f"{C.CYAN}{C.BOLD}{r[1]}{C.END}")
+        if r[4]:
+            print(f"  {C.BOLD}Usage:{C.END} {r[4]}")
+        if r[5]:
+            for ex in r[5].split('\n'):
+                if ex.strip():
+                    print(f"  {C.GREEN}${C.END} {ex}")
         else:
-            print(f"  {Colors.YELLOW}(No examples available){Colors.END}")
-        
+            print(f"  {C.YELLOW}(No examples available){C.END}")
         print()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CATEGORIES & STATS
+# ─────────────────────────────────────────────────────────────────────────────
 
 def list_categories():
-    """List all available categories"""
-    conn = connect_db()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("SELECT DISTINCT category FROM commands ORDER BY category")
-        categories = cursor.fetchall()
-        
-        print(f"\n{Colors.BOLD}Available Categories:{Colors.END}\n")
-        for cat in categories:
-            cursor.execute("SELECT COUNT(*) FROM commands WHERE category = ?", (cat[0],))
-            count = cursor.fetchone()[0]
-            print(f"  {Colors.CYAN}{cat[0]}{Colors.END} ({count} commands)")
-        print()
-    except sqlite3.Error as e:
-        print(f"{Colors.RED}Database error: {e}{Colors.END}")
-    finally:
-        conn.close()
+    conn = _connect()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT category FROM commands ORDER BY category")
+    cats = cur.fetchall()
+    print(f"\n{C.BOLD}Available Categories:{C.END}\n")
+    for (cat,) in cats:
+        cur.execute("SELECT COUNT(*) FROM commands WHERE category = ?", (cat,))
+        print(f"  {C.CYAN}{cat}{C.END} ({cur.fetchone()[0]} commands)")
+    conn.close()
+    print()
 
-def update_command_interactive():
-    """Update an existing command with personal notes/examples"""
-    print(f"\n{Colors.BOLD}Update Command{Colors.END}\n")
-    
-    try:
-        name = input("Command name to update: ").strip()
-        if not name:
-            print(f"{Colors.RED}Command name is required{Colors.END}")
-            return
-        
-        conn = connect_db()
-        cursor = conn.cursor()
-        
-        # Check if command exists
-        cursor.execute("SELECT * FROM commands WHERE name = ?", (name,))
-        result = cursor.fetchone()
-        
-        if not result:
-            print(f"{Colors.RED}✗ Command '{name}' not found{Colors.END}")
-            print(f"\nUse --add to create a new command")
-            conn.close()
-            return
-        
-        # Display current info
-        print(f"\n{Colors.CYAN}Current info for '{name}':{Colors.END}")
-        print(f"Description: {result[3]}")
-        if result[5]:  # examples
-            print(f"Examples: {result[5][:100]}...")
-        if result[7]:  # notes
-            print(f"Notes: {result[7][:100]}...")
-        
-        print(f"\n{Colors.YELLOW}Leave blank to keep existing value{Colors.END}\n")
-        
-        # Get updates
-        new_examples = input("Add/replace examples (separate with \\n): ").strip()
-        new_notes = input("Add/replace notes: ").strip()
-        new_tags = input("Add/replace tags (comma-separated): ").strip()
-        
-        # Update database
-        updates = []
-        params = []
-        
-        if new_examples:
-            updates.append("examples = ?")
-            params.append(new_examples)
-        if new_notes:
-            updates.append("notes = ?")
-            params.append(new_notes)
-        if new_tags:
-            updates.append("tags = ?")
-            params.append(new_tags)
-        
-        if updates:
-            params.append(name)
-            query = f"UPDATE commands SET {', '.join(updates)} WHERE name = ?"
-            cursor.execute(query, params)
-            conn.commit()
-            print(f"\n{Colors.GREEN}✓ Command '{name}' updated successfully!{Colors.END}\n")
-        else:
-            print(f"\n{Colors.YELLOW}No changes made{Colors.END}\n")
-        
-        conn.close()
-    
-    except KeyboardInterrupt:
-        print(f"\n\n{Colors.YELLOW}Cancelled{Colors.END}\n")
-    except Exception as e:
-        print(f"\n{Colors.RED}Error: {e}{Colors.END}\n")
+
+def show_stats():
+    conn = _connect()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM commands")
+    total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(DISTINCT category) FROM commands")
+    cats = cur.fetchone()[0]
+    conn.close()
+    print(f"\n{C.BOLD}CommandBrain Statistics{C.END}\n")
+    print(f"  Total commands: {C.CYAN}{total}{C.END}")
+    print(f"  Categories:     {C.CYAN}{cats}{C.END}")
+    print(f"  Database:       {C.CYAN}{DB_PATH}{C.END}\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPARE, ADD, UPDATE  (interactive commands)
+# ─────────────────────────────────────────────────────────────────────────────
 
 def compare_commands(cmd1: str, cmd2: str):
-    """Compare two commands side-by-side"""
-    conn = connect_db()
-    cursor = conn.cursor()
-    
-    # Get both commands
-    cursor.execute("SELECT * FROM commands WHERE name = ?", (cmd1,))
-    result1 = cursor.fetchone()
-    
-    cursor.execute("SELECT * FROM commands WHERE name = ?", (cmd2,))
-    result2 = cursor.fetchone()
-    
+    conn = _connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM commands WHERE name = ?", (cmd1,))
+    r1 = cur.fetchone()
+    cur.execute("SELECT * FROM commands WHERE name = ?", (cmd2,))
+    r2 = cur.fetchone()
     conn.close()
-    
-    if not result1:
-        print(f"{Colors.RED}Command '{cmd1}' not found{Colors.END}")
-        return
-    if not result2:
-        print(f"{Colors.RED}Command '{cmd2}' not found{Colors.END}")
-        return
-    
-    # Display comparison
-    print(f"\n{Colors.BOLD}Comparing {Colors.CYAN}{cmd1}{Colors.END} {Colors.BOLD}vs{Colors.END} {Colors.CYAN}{cmd2}{Colors.END}\n")
-    print(f"{Colors.BLUE}{'═' * 70}{Colors.END}\n")
-    
-    # Description
-    print(f"{Colors.BOLD}Description:{Colors.END}")
-    print(f"  {Colors.CYAN}{cmd1}:{Colors.END} {result1[3]}")
-    print(f"  {Colors.CYAN}{cmd2}:{Colors.END} {result2[3]}")
-    print()
-    
-    # Usage
-    print(f"{Colors.BOLD}Usage:{Colors.END}")
-    print(f"  {Colors.CYAN}{cmd1}:{Colors.END} {result1[4] if result1[4] else '(not specified)'}")
-    print(f"  {Colors.CYAN}{cmd2}:{Colors.END} {result2[4] if result2[4] else '(not specified)'}")
-    print()
-    
-    # Examples
-    print(f"{Colors.BOLD}Examples:{Colors.END}")
-    if result1[5]:
-        print(f"  {Colors.CYAN}{cmd1}:{Colors.END}")
-        for ex in result1[5].split('\n')[:2]:  # Show first 2 examples
-            if ex.strip():
-                print(f"    {Colors.GREEN}${Colors.END} {ex}")
-    if result2[5]:
-        print(f"  {Colors.CYAN}{cmd2}:{Colors.END}")
-        for ex in result2[5].split('\n')[:2]:
-            if ex.strip():
-                print(f"    {Colors.GREEN}${Colors.END} {ex}")
-    print()
-    
-    # Key differences in notes
-    if result1[7] or result2[7]:
-        print(f"{Colors.BOLD}Key Differences:{Colors.END}")
-        if result1[7]:
-            print(f"  {Colors.CYAN}{cmd1}:{Colors.END} {result1[7]}")
-        if result2[7]:
-            print(f"  {Colors.CYAN}{cmd2}:{Colors.END} {result2[7]}")
-        print()
-    
-    # Related commands
-    print(f"{Colors.BOLD}See also:{Colors.END}")
-    if result1[6]:
-        print(f"  From {cmd1}: {Colors.CYAN}{result1[6]}{Colors.END}")
-    if result2[6]:
-        print(f"  From {cmd2}: {Colors.CYAN}{result2[6]}{Colors.END}")
+
+    if not r1:
+        print(f"{C.RED}Command '{cmd1}' not found{C.END}"); return
+    if not r2:
+        print(f"{C.RED}Command '{cmd2}' not found{C.END}"); return
+
+    print(f"\n{C.BOLD}Comparing {C.CYAN}{cmd1}{C.END} {C.BOLD}vs{C.END} {C.CYAN}{cmd2}{C.END}\n")
+    print(f"{C.BLUE}{'═' * 70}{C.END}\n")
+
+    for label, idx in [("Description", 3), ("Usage", 4)]:
+        print(f"{C.BOLD}{label}:{C.END}")
+        print(f"  {C.CYAN}{cmd1}:{C.END} {r1[idx] or '(none)'}")
+        print(f"  {C.CYAN}{cmd2}:{C.END} {r2[idx] or '(none)'}\n")
+
+    print(f"{C.BOLD}Examples:{C.END}")
+    for name, r in [(cmd1, r1), (cmd2, r2)]:
+        if r[5]:
+            print(f"  {C.CYAN}{name}:{C.END}")
+            for ex in r[5].split('\n')[:2]:
+                if ex.strip():
+                    print(f"    {C.GREEN}${C.END} {ex}")
     print()
 
-def add_command_interactive():
-    """Interactive command addition"""
-    print(f"\n{Colors.BOLD}Add New Command{Colors.END}\n")
-    
+
+def add_command():
+    """Interactive command addition."""
+    print(f"\n{C.BOLD}Add New Command{C.END}\n")
     try:
         name = input("Command name: ").strip()
         if not name:
-            print(f"{Colors.RED}Command name is required{Colors.END}")
-            return
-        
-        category = input("Category: ").strip()
-        if not category:
-            category = "General"
-        
-        description = input("Description: ").strip()
-        if not description:
-            print(f"{Colors.RED}Description is required{Colors.END}")
-            return
-        
+            return print(f"{C.RED}Name required{C.END}")
+        cat   = input("Category [General]: ").strip() or "General"
+        desc  = input("Description: ").strip()
+        if not desc:
+            return print(f"{C.RED}Description required{C.END}")
         usage = input("Usage (optional): ").strip()
-        examples = input("Examples (separate multiple with \\n): ").strip()
-        related = input("Related commands (comma-separated): ").strip()
-        notes = input("Notes/tips (optional): ").strip()
-        tags = input("Tags (comma-separated): ").strip()
-        
-        conn = connect_db()
-        cursor = conn.cursor()
-        
+        examp = input("Examples (\\n separated): ").strip()
+        rel   = input("Related commands: ").strip()
+        notes = input("Notes: ").strip()
+        tags  = input("Tags (comma-separated): ").strip()
+
+        conn = _connect()
+        cur = conn.cursor()
         try:
-            cursor.execute("""
-                INSERT INTO commands 
-                (name, category, description, usage, examples, related_commands, notes, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (name, category, description, usage, examples, related, notes, tags))
-            
+            cur.execute("""INSERT INTO commands
+                (name,category,description,usage,examples,related_commands,notes,tags)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (name, cat, desc, usage, examp, rel, notes, tags))
             conn.commit()
-            print(f"\n{Colors.GREEN}✓ Command '{name}' added successfully!{Colors.END}\n")
-        
+            print(f"\n{C.GREEN}Added '{name}'{C.END}\n")
         except sqlite3.IntegrityError:
-            print(f"\n{Colors.RED}✗ Command '{name}' already exists{Colors.END}\n")
-        except sqlite3.Error as e:
-            print(f"\n{Colors.RED}Database error: {e}{Colors.END}\n")
+            print(f"\n{C.RED}'{name}' already exists{C.END}\n")
         finally:
             conn.close()
-    
     except KeyboardInterrupt:
-        print(f"\n\n{Colors.YELLOW}Cancelled{Colors.END}\n")
-    except Exception as e:
-        print(f"\n{Colors.RED}Error: {e}{Colors.END}\n")
+        print(f"\n{C.YELLOW}Cancelled{C.END}\n")
 
-def show_stats():
-    """Show database statistics"""
-    conn = connect_db()
-    cursor = conn.cursor()
-    
+
+def update_command():
+    """Interactive command update (add your own notes/examples)."""
+    print(f"\n{C.BOLD}Update Command{C.END}\n")
     try:
-        cursor.execute("SELECT COUNT(*) FROM commands")
-        total = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(DISTINCT category) FROM commands")
-        categories = cursor.fetchone()[0]
-        
-        print(f"\n{Colors.BOLD}CommandBrain Statistics{Colors.END}\n")
-        print(f"  Total commands: {Colors.CYAN}{total}{Colors.END}")
-        print(f"  Categories: {Colors.CYAN}{categories}{Colors.END}")
-        print(f"  Database: {Colors.CYAN}{get_db_path()}{Colors.END}")
-        print()
-    except sqlite3.Error as e:
-        print(f"{Colors.RED}Database error: {e}{Colors.END}")
-    finally:
+        name = input("Command name: ").strip()
+        if not name:
+            return print(f"{C.RED}Name required{C.END}")
+
+        conn = _connect()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM commands WHERE name = ?", (name,))
+        r = cur.fetchone()
+        if not r:
+            conn.close()
+            return print(f"{C.RED}'{name}' not found. Use --add to create it.{C.END}")
+
+        print(f"\n{C.CYAN}Current info for '{name}':{C.END}")
+        print(f"  Description: {r[3]}")
+        if r[5]: print(f"  Examples: {r[5][:80]}...")
+        if r[7]: print(f"  Notes: {r[7][:80]}...")
+        print(f"\n{C.YELLOW}Leave blank to keep current value{C.END}\n")
+
+        updates, params = [], []
+        for field, col in [("examples", "examples"), ("notes", "notes"), ("tags", "tags")]:
+            val = input(f"New {field}: ").strip()
+            if val:
+                updates.append(f"{col} = ?")
+                params.append(val)
+
+        if updates:
+            params.append(name)
+            cur.execute(f"UPDATE commands SET {', '.join(updates)} WHERE name = ?", params)
+            conn.commit()
+            print(f"\n{C.GREEN}Updated '{name}'{C.END}\n")
+        else:
+            print(f"\n{C.YELLOW}No changes{C.END}\n")
         conn.close()
+    except KeyboardInterrupt:
+        print(f"\n{C.YELLOW}Cancelled{C.END}\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORT  (replaces import_commands.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def import_from_file(path: str):
+    """Bulk import commands from a text file. Format: 'command: description' per line."""
+    if not os.path.exists(path):
+        return print(f"{C.RED}File not found: {path}{C.END}")
+
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+
+    # Strip RTF codes if present
+    content = re.sub(r'\\[a-z]+\d*\s?', '', content)
+    content = re.sub(r'[{}]', '', content)
+
+    commands, category = [], "General"
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # Detect category headers
+        if len(line) > 3 and ':' not in line and (
+            line.isupper() or any(kw in line for kw in ['Commands','Management','Information','Permissions','Control'])):
+            category = line.replace('Commands', '').replace('and', '').strip()
+            continue
+        # Parse 'command: description'
+        if ':' in line:
+            parts = line.split(':', 1)
+            cmd = parts[0].strip().split()[0].split('<')[0] if parts[0].strip() else ""
+            desc = parts[1].strip()
+            if cmd and len(cmd) > 1 and not cmd.startswith('-'):
+                commands.append((cmd, category, desc, '', '', '', '', category.lower().replace(' ', ',')))
+
+    if not commands:
+        return print(f"{C.YELLOW}No commands found in file{C.END}")
+
+    conn = _connect()
+    cur = conn.cursor()
+    added = skipped = 0
+    for c in commands:
+        try:
+            cur.execute("""INSERT INTO commands
+                (name,category,description,usage,examples,related_commands,notes,tags)
+                VALUES (?,?,?,?,?,?,?,?)""", c)
+            added += 1
+        except sqlite3.IntegrityError:
+            skipped += 1
+    conn.commit()
+    conn.close()
+    print(f"\n{C.GREEN}Imported {added} commands ({skipped} skipped/existing){C.END}\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKFLOWS  (data lives in data.py, display logic here)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _load_workflows():
+    try:
+        from data import WORKFLOWS
+        return WORKFLOWS
+    except ImportError:
+        return None
 
 def list_workflows():
-    """Display all available command chains/workflows."""
-    if workflows is None:
-        print(f"{Colors.RED}Command chaining feature not available.{Colors.END}")
-        return
-    
-    print(f"\n{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.END}")
-    print(f"{Colors.CYAN}║           AVAILABLE COMMAND CHAINS (WORKFLOWS)           ║{Colors.END}")
-    print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.END}\n")
-    
-    for workflow_id, workflow_data in workflows.WORKFLOWS.items():
-        print(f"\n{Colors.YELLOW}{Colors.BOLD}🔗 {workflow_id}{Colors.END}")
-        print(f"   Title: {workflow_data['name']}")
-        print(f"   {Colors.CYAN}Level: {workflow_data['difficulty']}{Colors.END}")
-        print(f"   {Colors.GREEN}Steps: {len(workflow_data['steps'])}{Colors.END}")
-        print(f"   Description: {workflow_data['description']}")
-    
-    print(f"\n{Colors.CYAN}💡 Usage: cb --chain <workflow-id>{Colors.END}")
-    print(f"{Colors.CYAN}   Example: cb --chain web-pentest{Colors.END}\n")
+    wf = _load_workflows()
+    if not wf:
+        return print(f"{C.RED}Workflow data not available{C.END}")
 
-def display_workflow(workflow_id):
-    """Display a complete step-by-step workflow."""
-    if workflows is None:
-        print(f"{Colors.RED}Command chaining feature not available.{Colors.END}")
-        return
-    
-    if workflow_id not in workflows.WORKFLOWS:
-        print(f"{Colors.RED}Workflow '{workflow_id}' not found.{Colors.END}")
-        print(f"{Colors.YELLOW}Use 'cb --list-chains' to see available workflows.{Colors.END}")
-        return
-    
-    workflow = workflows.WORKFLOWS[workflow_id]
-    
-    print(f"\n{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.END}")
-    workflow_title = workflow['name'].upper()
-    padding = (60 - len(workflow_title)) // 2
-    print(f"{Colors.CYAN}║{' ' * padding}{workflow_title}{' ' * (60 - len(workflow_title) - padding)}║{Colors.END}")
-    print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.END}\n")
-    
-    print(f"📋 Description: {workflow['description']}")
-    print(f"{Colors.CYAN}🎯 Level: {workflow['difficulty']}{Colors.END}")
-    print(f"{Colors.GREEN}📊 Total Steps: {len(workflow['steps'])}{Colors.END}\n")
-    
-    for step in workflow['steps']:
-        step_num = step['number']
-        print(f"\n{Colors.YELLOW}┌─ Step {step_num}: {step['title']}{Colors.END}")
-        print(f"{Colors.YELLOW}│{Colors.END}")
-        print(f"{Colors.YELLOW}│{Colors.END}  {Colors.CYAN}💻 Command:{Colors.END}")
-        print(f"{Colors.YELLOW}│{Colors.END}     {Colors.GREEN}{Colors.BOLD}{step['command']}{Colors.END}")
-        print(f"{Colors.YELLOW}│{Colors.END}")
-        print(f"{Colors.YELLOW}│{Colors.END}  🎯 Purpose: {step['purpose']}")
-        
-        if step.get('look_for'):
-            print(f"{Colors.YELLOW}│{Colors.END}")
-            print(f"{Colors.YELLOW}│{Colors.END}  {Colors.CYAN}👀 Look for:{Colors.END}")
-            for item in step['look_for']:
-                print(f"{Colors.YELLOW}│{Colors.END}     • {item}")
-        
-        if step.get('tips'):
-            print(f"{Colors.YELLOW}│{Colors.END}")
-            print(f"{Colors.YELLOW}│{Colors.END}  {Colors.HEADER}💡 Tips:{Colors.END}")
-            # Tips can be either a string or a list
-            tips = step['tips']
+    print(f"\n{C.CYAN}{'═' * 60}{C.END}")
+    print(f"{C.CYAN}  AVAILABLE COMMAND CHAINS (WORKFLOWS){C.END}")
+    print(f"{C.CYAN}{'═' * 60}{C.END}\n")
+
+    for wid, w in wf.items():
+        print(f"  {C.YELLOW}{C.BOLD}{wid}{C.END}")
+        print(f"    {w['name']}  [{w['difficulty']}]  ({len(w['steps'])} steps)")
+        print(f"    {w['description']}\n")
+
+    print(f"  {C.CYAN}Usage: cb --chain <workflow-id>{C.END}")
+    print(f"  {C.CYAN}Example: cb --chain web-pentest{C.END}\n")
+
+
+def display_workflow(wid: str):
+    wf = _load_workflows()
+    if not wf:
+        return print(f"{C.RED}Workflow data not available{C.END}")
+    if wid not in wf:
+        print(f"{C.RED}Workflow '{wid}' not found.{C.END}")
+        return print(f"{C.YELLOW}Use 'cb --list-chains' to see options.{C.END}")
+
+    w = wf[wid]
+    title = w['name'].upper()
+    pad = (60 - len(title)) // 2
+
+    print(f"\n{C.CYAN}{'═' * 60}{C.END}")
+    print(f"{C.CYAN}{' ' * pad}{title}{C.END}")
+    print(f"{C.CYAN}{'═' * 60}{C.END}\n")
+    print(f"  {w['description']}")
+    print(f"  {C.CYAN}Level: {w['difficulty']}{C.END}  |  {C.GREEN}Steps: {len(w['steps'])}{C.END}\n")
+
+    for s in w['steps']:
+        print(f"{C.YELLOW}  Step {s['number']}: {s['title']}{C.END}")
+        print(f"    Command:  {C.GREEN}{C.BOLD}{s['command']}{C.END}")
+        print(f"    Purpose:  {s['purpose']}")
+        if s.get('look_for'):
+            print(f"    Look for:")
+            for item in s['look_for']:
+                print(f"      - {item}")
+        tips = s.get('tips', '')
+        if tips:
             if isinstance(tips, str):
-                print(f"{Colors.YELLOW}│{Colors.END}     ✓ {tips}")
+                print(f"    Tip: {tips}")
             else:
-                for tip in tips:
-                    print(f"{Colors.YELLOW}│{Colors.END}     ✓ {tip}")
-        
-        print(f"{Colors.YELLOW}└{'─' * 58}{Colors.END}")
-    
-    print(f"\n{Colors.GREEN}{Colors.BOLD}✅ Workflow complete! Remember to test in a safe, legal environment.{Colors.END}")
-    print(f"{Colors.CYAN}📚 Learn more about each command: cb <command-name>{Colors.END}\n")
+                for t in tips:
+                    print(f"    Tip: {t}")
+        print()
+
+    print(f"  {C.GREEN}{C.BOLD}Workflow complete!{C.END} Test in a safe, legal environment.")
+    print(f"  {C.CYAN}Learn more: cb <command-name>{C.END}\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(
+    p = argparse.ArgumentParser(
+        prog="cb",
         description="CommandBrain - Smart Linux Command Reference",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  cb ssh                     # Search for ssh
-  cb password cracking       # Search by purpose/task
-  cb -d grep                 # Detailed view with full info
-  cb -e ssh                  # Examples only (quick reference)
-  cb --compare grep egrep    # Compare two commands
-  cb --list                  # List all categories
-  cb --update ssh            # Add your own notes/examples
-  
-  # Advanced:
-  cb -t name ssh             # Search command names only
-  cb -t category network     # Search by category
-        """
-    )
-    
-    # Global flags that work without subcommands
-    parser.add_argument('--list', action='store_true',
-                       help='List all categories')
-    parser.add_argument('--add', action='store_true',
-                       help='Add a new command interactively')
-    parser.add_argument('--update', action='store_true',
-                       help='Update an existing command with your own notes/examples')
-    parser.add_argument('--compare', nargs=2, metavar=('CMD1', 'CMD2'),
-                       help='Compare two commands side-by-side')
-    parser.add_argument('--stats', action='store_true',
-                       help='Show database statistics')
-    parser.add_argument('--chain', metavar='WORKFLOW',
-                       help='Show step-by-step command workflow/chain (e.g., web-pentest, network-recon)')
-    parser.add_argument('--list-chains', action='store_true',
-                       help='List all available command workflows/chains')
-    
-    # Search options (default action)
-    parser.add_argument('query', nargs='*', 
-                       help='Search term(s) - can be multiple words')
-    parser.add_argument('-d', '--detailed', action='store_true',
-                       help='Show detailed output with full information')
-    parser.add_argument('-e', '--examples', action='store_true',
-                       help='Show examples only (quick reference mode)')
-    parser.add_argument('-t', '--type', 
-                       choices=['all', 'name', 'category', 'tags', 'description'],
-                       default='all',
-                       help='Search type: all(default), name, category, tags, description')
-    
-    args = parser.parse_args()
-    
-    # Handle special commands first
-    if args.list_chains:
+  cb ssh                     Search for ssh
+  cb password cracking       Search by purpose/task
+  cb -d grep                 Detailed view
+  cb -e ssh                  Examples only (quick reference)
+  cb --compare grep egrep    Compare two commands
+  cb --list                  List all categories
+  cb --chain web-pentest     Show pentest workflow
+  cb --workflows             List all workflows
+  cb --setup                 Initialize database
+  cb --setup --kali          Initialize with Kali tools
+        """)
+
+    # Actions
+    p.add_argument('--setup',       action='store_true', help='Initialize/reset the command database')
+    p.add_argument('--kali',        action='store_true', help='Include Kali security tools (use with --setup)')
+    p.add_argument('--list',        action='store_true', help='List all categories')
+    p.add_argument('--add',         action='store_true', help='Add a new command interactively')
+    p.add_argument('--update',      action='store_true', help='Update a command with your notes')
+    p.add_argument('--compare',     nargs=2, metavar=('CMD1', 'CMD2'), help='Compare two commands')
+    p.add_argument('--stats',       action='store_true', help='Show database statistics')
+    p.add_argument('--chain', '--workflow',        metavar='WORKFLOW',  help='Show a step-by-step workflow')
+    p.add_argument('--list-chains', '--workflows',  action='store_true', help='List all workflows')
+    p.add_argument('--import-file', metavar='FILE',      help='Bulk import commands from a text file')
+
+    # Search options
+    p.add_argument('query', nargs='*', help='Search term(s)')
+    p.add_argument('-d', '--detailed', action='store_true', help='Detailed output')
+    p.add_argument('-e', '--examples', action='store_true', help='Examples only')
+    p.add_argument('-t', '--type', choices=['all','name','category','tags','description'],
+                   default='all', help='Search field (default: all)')
+    p.add_argument('--no-color', action='store_true', help='Disable colored output')
+
+    args = p.parse_args()
+
+    # Handle --no-color
+    if args.no_color:
+        for attr in vars(Colors):
+            if not attr.startswith('_'):
+                setattr(Colors, attr, '')
+
+    # Route to the right action
+    if args.setup:
+        setup_database(include_kali=args.kali)
+    elif args.list_chains:
         list_workflows()
     elif args.chain:
         display_workflow(args.chain)
     elif args.list:
         list_categories()
     elif args.add:
-        add_command_interactive()
+        add_command()
     elif args.update:
-        update_command_interactive()
+        update_command()
     elif args.compare:
-        compare_commands(args.compare[0], args.compare[1])
+        compare_commands(*args.compare)
     elif args.stats:
         show_stats()
+    elif args.import_file:
+        import_from_file(args.import_file)
     elif args.query:
-        # Join all query words into a single search string
-        search_term = ' '.join(args.query)
-        results = search_commands(search_term, args.type)
-        
-        # Choose display mode
+        term = ' '.join(args.query)
+        results = search_commands(term, args.type)
         if args.examples:
-            display_examples_only(results, search_term)
+            display_examples(results, term)
         elif args.detailed:
-            display_detailed(results, search_term)
+            display_detailed(results, term)
         else:
-            display_short(results, search_term)
+            display_short(results, term)
     else:
-        # No arguments provided
-        parser.print_help()
+        p.print_help()
+
 
 if __name__ == "__main__":
     main()
