@@ -85,7 +85,8 @@ def _connect(must_exist=True):
 
 def setup_database(include_kali=False):
     """Create DB, populate commands, and apply slang tags. All-in-one setup."""
-    from data import BASIC_COMMANDS, KALI_TOOLS, SLANG_MAPPINGS
+    from data import (BASIC_COMMANDS, KALI_TOOLS, SLANG_MAPPINGS,
+                        KALI_TOOLS_EXTENDED, SLANG_MAPPINGS_EXTENDED)
 
     conn = _connect(must_exist=False)
     cur = conn.cursor()
@@ -116,19 +117,21 @@ def setup_database(include_kali=False):
     """, BASIC_COMMANDS)
     basic_count = len(BASIC_COMMANDS)
 
-    # Insert Kali tools
+    # Insert Kali tools (original + extended)
     kali_count = 0
     if include_kali:
+        all_kali = KALI_TOOLS + KALI_TOOLS_EXTENDED
         cur.executemany("""
             INSERT OR IGNORE INTO commands
             (name,category,description,usage,examples,related_commands,notes,tags)
             VALUES (?,?,?,?,?,?,?,?)
-        """, KALI_TOOLS)
-        kali_count = len(KALI_TOOLS)
+        """, all_kali)
+        kali_count = len(all_kali)
 
-    # Apply slang / purpose-based search terms
+    # Apply slang / purpose-based search terms (original + extended)
+    all_slang = {**SLANG_MAPPINGS, **SLANG_MAPPINGS_EXTENDED}
     enhanced = 0
-    for cmd_name, slang_list in SLANG_MAPPINGS.items():
+    for cmd_name, slang_list in all_slang.items():
         cur.execute("SELECT tags FROM commands WHERE name = ?", (cmd_name,))
         row = cur.fetchone()
         if not row:

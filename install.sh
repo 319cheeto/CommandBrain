@@ -21,7 +21,31 @@ info() { printf "${CYAN}  -->>${NC} %s\n" "$1"; }
 
 VENV_PATH="$HOME/.commandbrain_env"
 DB_PATH="$HOME/.commandbrain.db"
+LOG_FILE="$HOME/.commandbrain_install.log"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Append a timestamped message to the install log
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
+
+# ── Block sudo/root (the #1 cause of broken installs) ────────────────────────
+# Running as root installs everything into /root/ instead of the user's home.
+# The user then can't find cb, the database, or the venv.
+block_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+        echo ""
+        fail "Do NOT run this installer with sudo!"
+        echo ""
+        echo "  Why: sudo installs everything into /root/ instead of your home directory."
+        echo "        That's why 'cb' doesn't work after a sudo install."
+        echo ""
+        echo "  Fix: Run it without sudo:"
+        printf "    ${GREEN}bash install.sh${NC}\n"
+        echo ""
+        echo "  If you get permission errors, the installer will tell you what to fix."
+        echo ""
+        exit 1
+    fi
+}
 
 # ── Detect the user's ACTUAL default shell ───────────────────────────────────
 # $SHELL is the login shell (what matters for persistence), not the current
@@ -142,6 +166,7 @@ print_reload_instructions() {
 # INSTALL
 # ═════════════════════════════════════════════════════════════════════════════
 do_install() {
+    block_sudo
     echo ""
     printf "${CYAN}╔════════════════════════════════════════════════╗${NC}\n"
     printf "${CYAN}║        CommandBrain Installer v2.0             ║${NC}\n"
@@ -195,10 +220,54 @@ do_install() {
     # shellcheck disable=SC1091
     source "$VENV_PATH/bin/activate"
 
-    # ── Step 3: Install package (NOT editable — survives folder deletion) ─
+    # ── Step 3: Install package ────────────────────────────────────────
+    # Copy source to a temp dir so pip can write egg-info without needing
+    # write permission to the original source folder.
+
+    # Clean up any root-owned egg-info from previous sudo attempts
+    if [ -d "$SCRIPT_DIR/commandbrain.egg-info" ]; then
+        rm -rf "$SCRIPT_DIR/commandbrain.egg-info" 2>/dev/null || \
+            sudo rm -rf "$SCRIPT_DIR/commandbrain.egg-info" 2>/dev/null || true
+    fi
+
+    echo "" > "$LOG_FILE"   # reset log
+    log "=== CommandBrain Install $(date) ==="
+    log "Source: $SCRIPT_DIR"
+    log "Python: $(python3 --version 2>&1)"
+    log "pip:    $(pip --version 2>&1)"
+
+    TEMP_BUILD=$(mktemp -d)
+    log "Temp build dir: $TEMP_BUILD"
+    cp "$SCRIPT_DIR"/commandbrain.py "$SCRIPT_DIR"/data.py "$SCRIPT_DIR"/setup.py "$TEMP_BUILD/"
+    [ -f "$SCRIPT_DIR/README.md" ]        && cp "$SCRIPT_DIR/README.md" "$TEMP_BUILD/"
+    [ -f "$SCRIPT_DIR/requirements.txt" ] && cp "$SCRIPT_DIR/requirements.txt" "$TEMP_BUILD/"
+
     info "Installing CommandBrain..."
-    pip install --upgrade pip -q 2>/dev/null
-    pip install . -q 2>/dev/null
+
+    # Upgrade pip (non-critical)
+    PIP_OUT=$(pip install --upgrade pip 2>&1) || true
+    log "pip upgrade: $PIP_OUT"
+
+    # Install the package from the temp copy
+    PIP_OUT=$(pip install "$TEMP_BUILD" 2>&1)
+    PIP_EXIT=$?
+    log "pip install exit code: $PIP_EXIT"
+    log "pip install output:\n$PIP_OUT"
+
+    rm -rf "$TEMP_BUILD"
+
+    if [ $PIP_EXIT -ne 0 ]; then
+        echo "$PIP_OUT"
+        echo ""
+        fail "pip install failed! Full log: $LOG_FILE"
+        echo ""
+        echo "  Common fixes:"
+        echo "    sudo apt install python3-venv python3-pip python3-dev"
+        echo "    Check permissions: ls -la $SCRIPT_DIR"
+        echo "    Full error log:   cat $LOG_FILE"
+        echo ""
+        exit 1
+    fi
     ok "CommandBrain installed"
 
     # ── Step 4: Initialize database ───────────────────────────────────────
@@ -236,7 +305,17 @@ do_install() {
     if [ -f "$VENV_PATH/bin/cb" ]; then
         ok "found"
     else
-        warn "not in PATH yet (will work after reload)"
+        fail "cb not found in venv!"
+        failed=true
+    fi
+
+    # Actually test that cb runs
+    printf "  cb works:    "
+    if "$VENV_PATH/bin/cb" --help &>/dev/null; then
+        ok "verified"
+    else
+        fail "cb exists but cannot run — check Python errors"
+        failed=true
     fi
 
     if $failed; then
@@ -263,6 +342,7 @@ do_install() {
 # UNINSTALL
 # ═════════════════════════════════════════════════════════════════════════════
 do_uninstall() {
+    block_sudo
     echo ""
     printf "${YELLOW}Uninstalling CommandBrain...${NC}\n"
     echo ""
@@ -308,6 +388,7 @@ do_uninstall() {
 # UPDATE
 # ═════════════════════════════════════════════════════════════════════════════
 do_update() {
+    block_sudo
     echo ""
     printf "${CYAN}Updating CommandBrain...${NC}\n"
     echo ""
@@ -326,8 +407,26 @@ do_update() {
     if [ -d "$VENV_PATH" ]; then
         # shellcheck disable=SC1091
         source "$VENV_PATH/bin/activate"
+
+        # Copy source to temp dir (avoids permission issues)
+        TEMP_BUILD=$(mktemp -d)
+        cp "$SCRIPT_DIR"/commandbrain.py "$SCRIPT_DIR"/data.py "$SCRIPT_DIR"/setup.py "$TEMP_BUILD/"
+        [ -f "$SCRIPT_DIR/README.md" ]        && cp "$SCRIPT_DIR/README.md" "$TEMP_BUILD/"
+        [ -f "$SCRIPT_DIR/requirements.txt" ] && cp "$SCRIPT_DIR/requirements.txt" "$TEMP_BUILD/"
+
         info "Reinstalling package..."
-        pip install . -q 2>/dev/null
+        log "=== CommandBrain Update $(date) ==="
+        PIP_OUT=$(pip install "$TEMP_BUILD" 2>&1)
+        PIP_EXIT=$?
+        log "pip install exit code: $PIP_EXIT"
+        log "pip install output:\n$PIP_OUT"
+        rm -rf "$TEMP_BUILD"
+
+        if [ $PIP_EXIT -ne 0 ]; then
+            echo "$PIP_OUT"
+            fail "pip install failed! Full log: $LOG_FILE"
+            exit 1
+        fi
         ok "Package updated"
     else
         fail "Virtual environment not found. Run: bash install.sh"
@@ -391,6 +490,15 @@ do_diagnose() {
         printf "${GREEN}  Status: HEALTHY${NC}\n"
     else
         printf "${RED}  Status: NEEDS REPAIR — run: bash install.sh${NC}\n"
+    fi
+
+    echo ""
+    printf "  Install log: "
+    if [ -f "$LOG_FILE" ]; then
+        ok "$LOG_FILE"
+        echo "    View with:  cat $LOG_FILE"
+    else
+        info "no log yet (created on install)"
     fi
     echo ""
 }
