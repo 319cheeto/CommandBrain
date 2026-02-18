@@ -299,15 +299,182 @@ def list_categories():
 def show_stats():
     conn = _connect()
     cur = conn.cursor()
+
     cur.execute("SELECT COUNT(*) FROM commands")
     total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(DISTINCT name) FROM commands")
+    unique = cur.fetchone()[0]
     cur.execute("SELECT COUNT(DISTINCT category) FROM commands")
     cats = cur.fetchone()[0]
+
+    # Top categories
+    cur.execute("""SELECT category, COUNT(*) as cnt FROM commands
+                   GROUP BY category ORDER BY cnt DESC LIMIT 10""")
+    top_cats = cur.fetchall()
+
+    # DB file size
+    db_size = "N/A"
+    if os.path.exists(DB_PATH):
+        size_bytes = os.path.getsize(DB_PATH)
+        if size_bytes < 1024:
+            db_size = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            db_size = f"{size_bytes / 1024:.1f} KB"
+        else:
+            db_size = f"{size_bytes / (1024 * 1024):.1f} MB"
+
+    # Commands with examples vs without
+    cur.execute("SELECT COUNT(*) FROM commands WHERE examples IS NOT NULL AND examples != ''")
+    with_examples = cur.fetchone()[0]
+
     conn.close()
-    print(f"\n{C.BOLD}CommandBrain Statistics{C.END}\n")
-    print(f"  Total commands: {C.CYAN}{total}{C.END}")
-    print(f"  Categories:     {C.CYAN}{cats}{C.END}")
-    print(f"  Database:       {C.CYAN}{DB_PATH}{C.END}\n")
+
+    print(f"\n{C.CYAN}{'═' * 50}{C.END}")
+    print(f"{C.CYAN}  COMMANDBRAIN STATISTICS{C.END}")
+    print(f"{C.CYAN}{'═' * 50}{C.END}\n")
+    print(f"  {C.BOLD}Total entries:{C.END}   {C.CYAN}{total}{C.END}")
+    print(f"  {C.BOLD}Unique tools:{C.END}    {C.CYAN}{unique}{C.END}")
+    print(f"  {C.BOLD}Categories:{C.END}      {C.CYAN}{cats}{C.END}")
+    print(f"  {C.BOLD}With examples:{C.END}   {C.CYAN}{with_examples}{C.END} / {total}")
+    print(f"  {C.BOLD}Database:{C.END}        {C.CYAN}{DB_PATH}{C.END}")
+    print(f"  {C.BOLD}Database size:{C.END}   {C.CYAN}{db_size}{C.END}")
+
+    print(f"\n  {C.BOLD}Top Categories:{C.END}")
+    for cat, cnt in top_cats:
+        bar = '█' * min(cnt, 30)
+        print(f"    {C.GREEN}{cat:<28}{C.END} {C.CYAN}{cnt:>3}{C.END}  {bar}")
+    print()
+
+
+def dump_all_commands(group_by_cat=True):
+    """List every command in the database, optionally grouped by category."""
+    conn = _connect()
+    cur = conn.cursor()
+
+    if group_by_cat:
+        cur.execute("SELECT DISTINCT category FROM commands ORDER BY category")
+        cats = [r[0] for r in cur.fetchall()]
+
+        print(f"\n{C.CYAN}{'═' * 60}{C.END}")
+        print(f"{C.CYAN}  ALL COMMANDS IN DATABASE{C.END}")
+        print(f"{C.CYAN}{'═' * 60}{C.END}")
+
+        grand_total = 0
+        for cat in cats:
+            cur.execute("SELECT name, description FROM commands WHERE category = ? ORDER BY name", (cat,))
+            rows = cur.fetchall()
+            grand_total += len(rows)
+            print(f"\n  {C.YELLOW}{C.BOLD}{cat}{C.END} ({len(rows)})")
+            for name, desc in rows:
+                short = desc[:55] + "..." if len(desc) > 58 else desc
+                print(f"    {C.GREEN}{name:<20}{C.END} {short}")
+
+        print(f"\n  {C.BOLD}Total: {C.CYAN}{grand_total}{C.END} {C.BOLD}commands{C.END}\n")
+    else:
+        cur.execute("SELECT name, category, description FROM commands ORDER BY name")
+        rows = cur.fetchall()
+        print(f"\n{C.BOLD}All {len(rows)} commands (alphabetical):{C.END}\n")
+        for name, cat, desc in rows:
+            short = desc[:45] + "..." if len(desc) > 48 else desc
+            print(f"  {C.GREEN}{name:<20}{C.END} {C.YELLOW}[{cat}]{C.END} {short}")
+        print()
+
+    conn.close()
+
+
+def interactive_db():
+    """Interactive SQL shell for power users to query/modify the database directly."""
+    if not os.path.exists(DB_PATH):
+        print(f"{C.RED}Database not found! Run:  cb --setup{C.END}")
+        return
+
+    print(f"\n{C.CYAN}{'═' * 60}{C.END}")
+    print(f"{C.CYAN}  COMMANDBRAIN INTERACTIVE DATABASE{C.END}")
+    print(f"{C.CYAN}{'═' * 60}{C.END}\n")
+    print(f"  {C.BOLD}Database:{C.END} {C.CYAN}{DB_PATH}{C.END}")
+    print(f"  {C.BOLD}Table:{C.END}    {C.CYAN}commands{C.END} (id, name, category, description,")
+    print(f"           usage, examples, related_commands, notes, tags)\n")
+    print(f"  {C.YELLOW}Quick commands:{C.END}")
+    print(f"    {C.GREEN}.tables{C.END}    - Show tables")
+    print(f"    {C.GREEN}.schema{C.END}    - Show table schema")
+    print(f"    {C.GREEN}.count{C.END}     - Count all commands")
+    print(f"    {C.GREEN}.categories{C.END} - List categories")
+    print(f"    {C.GREEN}.quit{C.END}      - Exit")
+    print(f"\n  Type any SQL (SELECT, INSERT, UPDATE, DELETE).")
+    print(f"  {C.RED}WARNING: Changes are permanent. Use with care.{C.END}\n")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    while True:
+        try:
+            sql = input(f"{C.CYAN}cb-sql>{C.END} ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n{C.YELLOW}Exiting database shell.{C.END}\n")
+            break
+
+        if not sql:
+            continue
+
+        # Dot-commands (shortcuts)
+        if sql.lower() in ('.quit', '.exit', 'exit', 'quit'):
+            print(f"{C.YELLOW}Exiting database shell.{C.END}\n")
+            break
+        elif sql.lower() == '.tables':
+            sql = "SELECT name FROM sqlite_master WHERE type='table'"
+        elif sql.lower() == '.schema':
+            sql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='commands'"
+        elif sql.lower() == '.count':
+            sql = "SELECT COUNT(*) AS total_commands FROM commands"
+        elif sql.lower() == '.categories':
+            sql = "SELECT category, COUNT(*) AS count FROM commands GROUP BY category ORDER BY count DESC"
+
+        try:
+            cur = conn.execute(sql)
+
+            # If it's a query that returns rows
+            if cur.description:
+                cols = [d[0] for d in cur.description]
+                rows = cur.fetchall()
+
+                if not rows:
+                    print(f"  {C.YELLOW}(0 rows){C.END}")
+                    continue
+
+                # Calculate column widths
+                widths = [len(c) for c in cols]
+                str_rows = []
+                for row in rows:
+                    str_row = [str(v) if v is not None else "NULL" for v in row]
+                    # Truncate long values for display
+                    str_row = [v[:60] + "..." if len(v) > 63 else v for v in str_row]
+                    for i, v in enumerate(str_row):
+                        widths[i] = max(widths[i], len(v))
+                    str_rows.append(str_row)
+
+                # Limit column widths
+                widths = [min(w, 63) for w in widths]
+
+                # Print header
+                header = " | ".join(c.ljust(widths[i]) for i, c in enumerate(cols))
+                print(f"  {C.BOLD}{header}{C.END}")
+                print(f"  {'─' * len(header)}")
+
+                # Print rows
+                for sr in str_rows:
+                    line = " | ".join(sr[i].ljust(widths[i]) for i in range(len(cols)))
+                    print(f"  {line}")
+
+                print(f"\n  {C.CYAN}({len(rows)} row{'s' if len(rows) != 1 else ''}){C.END}")
+            else:
+                conn.commit()
+                print(f"  {C.GREEN}OK — {cur.rowcount} row(s) affected{C.END}")
+
+        except sqlite3.Error as e:
+            print(f"  {C.RED}SQL Error: {e}{C.END}")
+
+    conn.close()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COMPARE, ADD, UPDATE  (interactive commands)
@@ -555,6 +722,9 @@ Examples:
   cb -e ssh                  Examples only (quick reference)
   cb --compare grep egrep    Compare two commands
   cb --list                  List all categories
+  cb --dump                  List every command (grouped by category)
+  cb --stats                 Show database statistics
+  cb --db                    Interactive SQL shell (power users)
   cb --chain web-pentest     Show pentest workflow
   cb --workflows             List all workflows
   cb --setup                 Initialize database
@@ -569,6 +739,8 @@ Examples:
     p.add_argument('--update',      action='store_true', help='Update a command with your notes')
     p.add_argument('--compare',     nargs=2, metavar=('CMD1', 'CMD2'), help='Compare two commands')
     p.add_argument('--stats',       action='store_true', help='Show database statistics')
+    p.add_argument('--dump',        action='store_true', help='List every command in the database')
+    p.add_argument('--db',          action='store_true', help='Interactive SQL shell (power users)')
     p.add_argument('--chain', '--workflow',        metavar='WORKFLOW',  help='Show a step-by-step workflow')
     p.add_argument('--list-chains', '--workflows',  action='store_true', help='List all workflows')
     p.add_argument('--import-file', metavar='FILE',      help='Bulk import commands from a text file')
@@ -606,6 +778,10 @@ Examples:
         compare_commands(*args.compare)
     elif args.stats:
         show_stats()
+    elif args.dump:
+        dump_all_commands()
+    elif args.db:
+        interactive_db()
     elif args.import_file:
         import_from_file(args.import_file)
     elif args.query:
