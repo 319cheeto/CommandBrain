@@ -3876,6 +3876,496 @@ SLANG_MAPPINGS_EXTENDED = {
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SEARCH TAXONOMY — Maps search terms to related suggestions
+# Provides "Also try:" suggestions at the bottom of search results, so
+# students can quickly refine searches instead of wading through huge lists.
+# Each entry: aliases (normalized forms), related_searches (suggestions shown)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SEARCH_TAXONOMY = {
+    # ── Networking & Connectivity ─────────────────────────────────────
+    "networking": {
+        "aliases": ["network", "net", "network tools", "networking tools",
+                     "network utility", "network utilities", "net tools"],
+        "related_searches": ["ip address", "dns lookup", "port scanning",
+                             "packet sniffing", "firewall", "network monitoring",
+                             "tunneling", "bandwidth", "routing"],
+    },
+    "ip address": {
+        "aliases": ["ip", "my ip", "show ip", "ip config", "ipconfig",
+                     "ip addr", "ip a", "what is my ip", "ip address command"],
+        "related_searches": ["networking", "dns lookup", "subnet calculator",
+                             "routing", "network interface", "arp"],
+    },
+    "dns lookup": {
+        "aliases": ["dns", "domain lookup", "resolve domain", "name server",
+                     "nameserver", "dns query", "dns resolution"],
+        "related_searches": ["ip address", "subdomain enumeration",
+                             "networking", "dns attack", "domain info", "osint"],
+    },
+    "dns attack": {
+        "aliases": ["dns spoof", "dns poison", "dns hijack", "dns tunnel",
+                     "dns exfiltration", "dns mitm"],
+        "related_searches": ["dns lookup", "mitm", "tunneling",
+                             "network attack", "spoofing"],
+    },
+    "port scanning": {
+        "aliases": ["port scan", "scan ports", "open ports", "find ports",
+                     "port scanner", "scan network", "network scan"],
+        "related_searches": ["service detection", "vulnerability scanning",
+                             "host discovery", "networking", "enumeration"],
+    },
+    "packet sniffing": {
+        "aliases": ["sniffing", "sniff", "packet capture", "pcap",
+                     "traffic analysis", "capture packets", "capture traffic",
+                     "sniff traffic", "network sniff"],
+        "related_searches": ["network monitoring", "mitm", "networking",
+                             "wireshark", "tcpdump", "forensics"],
+    },
+    "firewall": {
+        "aliases": ["block port", "allow port", "firewall rules",
+                     "packet filter", "network filter", "iptables", "nftables"],
+        "related_searches": ["networking", "port scanning", "ids",
+                             "network security", "tunneling"],
+    },
+    "network monitoring": {
+        "aliases": ["monitor network", "bandwidth", "traffic monitor",
+                     "network usage", "bandwidth monitor", "network stats"],
+        "related_searches": ["packet sniffing", "networking", "ids",
+                             "system monitoring", "network security"],
+    },
+    "tunneling": {
+        "aliases": ["tunnel", "pivoting", "pivot", "port forwarding",
+                     "port forward", "socks proxy", "ssh tunnel",
+                     "reverse tunnel", "firewall bypass"],
+        "related_searches": ["networking", "vpn", "lateral movement",
+                             "post exploitation", "ssh"],
+    },
+    "routing": {
+        "aliases": ["route", "gateway", "default gateway", "routing table",
+                     "network route", "ip route"],
+        "related_searches": ["networking", "ip address", "firewall",
+                             "network interface"],
+    },
+    "subnet calculator": {
+        "aliases": ["subnet", "subnetting", "cidr", "subnet mask",
+                     "ip range", "network range", "calculate subnet"],
+        "related_searches": ["ip address", "networking", "routing"],
+    },
+    "arp": {
+        "aliases": ["arp table", "arp scan", "arp cache", "mac address",
+                     "ip to mac", "layer 2", "arp request"],
+        "related_searches": ["networking", "host discovery", "mitm",
+                             "spoofing", "ip address"],
+    },
+
+    # ── Scanning & Reconnaissance ─────────────────────────────────────
+    "scanning": {
+        "aliases": ["scan", "scanner", "recon", "reconnaissance",
+                     "enumeration", "enum", "discovery"],
+        "related_searches": ["port scanning", "vulnerability scanning",
+                             "web scanning", "host discovery",
+                             "service detection", "osint"],
+    },
+    "vulnerability scanning": {
+        "aliases": ["vuln scan", "vulnerability scan", "find vulnerabilities",
+                     "cve scan", "security scan", "vuln check"],
+        "related_searches": ["port scanning", "web scanning", "exploitation",
+                             "nmap scripts", "scanning"],
+    },
+    "host discovery": {
+        "aliases": ["find hosts", "discover hosts", "alive hosts",
+                     "ping sweep", "who is on network", "live hosts",
+                     "host scan", "network discovery"],
+        "related_searches": ["port scanning", "networking", "arp",
+                             "scanning"],
+    },
+    "service detection": {
+        "aliases": ["detect service", "service version", "banner grab",
+                     "service scan", "version detection", "identify service"],
+        "related_searches": ["port scanning", "vulnerability scanning",
+                             "enumeration", "scanning"],
+    },
+    "subdomain enumeration": {
+        "aliases": ["subdomain", "subdomains", "find subdomains",
+                     "subdomain finder", "subdomain scan", "subdomain brute"],
+        "related_searches": ["dns lookup", "osint", "web scanning",
+                             "domain info", "scanning"],
+    },
+
+    # ── Web Testing ───────────────────────────────────────────────────
+    "web testing": {
+        "aliases": ["web hacking", "web pentest", "web security",
+                     "website testing", "web app testing", "web application",
+                     "webapp", "website hack", "web attack"],
+        "related_searches": ["sql injection", "xss", "directory scanning",
+                             "web scanning", "proxy", "fuzzing",
+                             "command injection"],
+    },
+    "web scanning": {
+        "aliases": ["web scan", "website scan", "web vulnerability scan",
+                     "site scan", "web vuln", "web scanner"],
+        "related_searches": ["web testing", "directory scanning",
+                             "vulnerability scanning", "port scanning"],
+    },
+    "sql injection": {
+        "aliases": ["sqli", "sql inject", "database hack", "sql attack",
+                     "database attack", "db hack"],
+        "related_searches": ["web testing", "xss", "command injection",
+                             "exploitation", "database"],
+    },
+    "xss": {
+        "aliases": ["cross site scripting", "script injection",
+                     "reflected xss", "stored xss", "dom xss"],
+        "related_searches": ["web testing", "sql injection", "web scanning",
+                             "browser exploitation", "fuzzing"],
+    },
+    "directory scanning": {
+        "aliases": ["dir scan", "directory brute force", "find directories",
+                     "hidden directories", "content discovery", "dir busting",
+                     "directory enumeration", "dir brute"],
+        "related_searches": ["web testing", "web scanning", "fuzzing",
+                             "enumeration"],
+    },
+    "fuzzing": {
+        "aliases": ["fuzz", "web fuzz", "parameter fuzz", "fuzz testing",
+                     "fuzzer", "param fuzz"],
+        "related_searches": ["web testing", "directory scanning",
+                             "brute force", "sql injection"],
+    },
+    "command injection": {
+        "aliases": ["cmd injection", "os injection", "rce",
+                     "remote code execution", "shell injection"],
+        "related_searches": ["web testing", "sql injection", "exploitation",
+                             "reverse shell"],
+    },
+    "proxy": {
+        "aliases": ["web proxy", "intercepting proxy", "http proxy",
+                     "https proxy", "intercept traffic", "burp"],
+        "related_searches": ["web testing", "mitm", "packet sniffing",
+                             "web scanning"],
+    },
+
+    # ── Password Attacks ──────────────────────────────────────────────
+    "password cracking": {
+        "aliases": ["crack password", "password crack", "hash cracking",
+                     "crack hash", "break password", "password attack",
+                     "brute force password", "pw crack", "hash crack",
+                     "password breaking"],
+        "related_searches": ["brute force", "hash identification", "wordlist",
+                             "credential dumping", "authentication"],
+    },
+    "brute force": {
+        "aliases": ["bruteforce", "brute-force", "brute forcing",
+                     "login attack", "credential attack", "dictionary attack",
+                     "login crack"],
+        "related_searches": ["password cracking", "wordlist",
+                             "authentication", "web testing"],
+    },
+    "wordlist": {
+        "aliases": ["wordlists", "password list", "dictionary", "rockyou",
+                     "generate wordlist", "custom wordlist", "password file",
+                     "word list"],
+        "related_searches": ["password cracking", "brute force", "fuzzing"],
+    },
+    "hash identification": {
+        "aliases": ["identify hash", "what hash", "hash type", "hash format",
+                     "recognize hash", "hash id", "what kind of hash"],
+        "related_searches": ["password cracking", "hash cracking"],
+    },
+    "authentication": {
+        "aliases": ["login", "auth", "credential", "credentials",
+                     "username password", "login page", "sign in"],
+        "related_searches": ["password cracking", "brute force",
+                             "credential dumping", "web testing"],
+    },
+
+    # ── Exploitation ──────────────────────────────────────────────────
+    "exploitation": {
+        "aliases": ["exploit", "exploiting", "run exploit",
+                     "exploit framework", "exploits", "hack"],
+        "related_searches": ["password cracking", "privilege escalation",
+                             "reverse shell", "post exploitation",
+                             "vulnerability scanning"],
+    },
+    "reverse shell": {
+        "aliases": ["rev shell", "reverse connection", "callback",
+                     "bind shell", "shell", "get shell", "pop shell"],
+        "related_searches": ["exploitation", "netcat", "post exploitation",
+                             "privilege escalation"],
+    },
+    "privilege escalation": {
+        "aliases": ["privesc", "priv esc", "escalate privileges",
+                     "get root", "become root", "become admin", "get admin",
+                     "get system", "root access", "escalation"],
+        "related_searches": ["exploitation", "post exploitation", "suid",
+                             "sudo", "credential dumping"],
+    },
+    "post exploitation": {
+        "aliases": ["post exploit", "after exploitation",
+                     "post-exploitation", "lateral movement",
+                     "maintain access", "persistence"],
+        "related_searches": ["privilege escalation", "credential dumping",
+                             "tunneling", "persistence", "lateral movement"],
+    },
+    "lateral movement": {
+        "aliases": ["move laterally", "pivot", "spread",
+                     "remote execution", "remote shell", "hop"],
+        "related_searches": ["post exploitation", "tunneling",
+                             "active directory", "credential dumping",
+                             "exploitation"],
+    },
+    "persistence": {
+        "aliases": ["maintain access", "persistent access", "backdoor",
+                     "keep access", "survive reboot", "implant"],
+        "related_searches": ["post exploitation", "exploitation",
+                             "reverse shell", "c2"],
+    },
+    "c2": {
+        "aliases": ["command and control", "c2 framework", "c&c",
+                     "implant", "beacon", "agent"],
+        "related_searches": ["post exploitation", "persistence",
+                             "exploitation", "lateral movement"],
+    },
+
+    # ── Wireless ──────────────────────────────────────────────────────
+    "wireless": {
+        "aliases": ["wifi", "wifi hack", "wifi crack", "wireless hack",
+                     "wpa", "wpa2", "wireless security", "wifi attack",
+                     "wifi test", "wireless pentest", "crack wifi"],
+        "related_searches": ["networking", "packet sniffing", "brute force",
+                             "monitor mode", "password cracking"],
+    },
+
+    # ── OSINT & Recon ─────────────────────────────────────────────────
+    "osint": {
+        "aliases": ["open source intelligence", "information gathering",
+                     "intelligence", "recon", "reconnaissance",
+                     "gather info", "intel"],
+        "related_searches": ["subdomain enumeration", "dns lookup",
+                             "email gathering", "social media", "domain info",
+                             "web scanning"],
+    },
+    "email gathering": {
+        "aliases": ["email harvest", "find emails", "email recon",
+                     "email enumeration", "email osint", "email lookup"],
+        "related_searches": ["osint", "social engineering",
+                             "subdomain enumeration"],
+    },
+    "domain info": {
+        "aliases": ["domain lookup", "domain registration", "whois",
+                     "who owns", "domain owner", "domain recon"],
+        "related_searches": ["osint", "dns lookup",
+                             "subdomain enumeration"],
+    },
+    "social media": {
+        "aliases": ["social media search", "find username", "account finder",
+                     "username lookup", "people search", "social media osint"],
+        "related_searches": ["osint", "email gathering",
+                             "social engineering"],
+    },
+
+    # ── MITM & Spoofing ──────────────────────────────────────────────
+    "mitm": {
+        "aliases": ["man in the middle", "man-in-the-middle",
+                     "arp poison", "arp poisoning", "intercept traffic",
+                     "arp spoof", "network attack"],
+        "related_searches": ["packet sniffing", "networking", "spoofing",
+                             "credential capture", "dns attack"],
+    },
+    "spoofing": {
+        "aliases": ["spoof", "fake", "impersonate", "mac spoof",
+                     "ip spoof", "identity spoof"],
+        "related_searches": ["mitm", "networking", "social engineering",
+                             "dns attack"],
+    },
+
+    # ── Forensics ─────────────────────────────────────────────────────
+    "forensics": {
+        "aliases": ["digital forensics", "forensic analysis",
+                     "investigation", "incident response", "dfir"],
+        "related_searches": ["memory forensics", "file recovery",
+                             "steganography", "disk analysis",
+                             "malware analysis", "logs"],
+    },
+    "steganography": {
+        "aliases": ["stego", "hidden data", "hidden message", "hide data",
+                     "steg", "data hiding", "secret message"],
+        "related_searches": ["forensics", "ctf", "file analysis",
+                             "image analysis", "encryption"],
+    },
+    "file recovery": {
+        "aliases": ["recover files", "undelete", "recover deleted",
+                     "data recovery", "carve files", "recover photos"],
+        "related_searches": ["forensics", "disk analysis"],
+    },
+    "memory forensics": {
+        "aliases": ["memory analysis", "ram analysis", "memory dump",
+                     "volatile data", "ram dump"],
+        "related_searches": ["forensics", "incident response",
+                             "malware analysis", "credential dumping"],
+    },
+    "disk analysis": {
+        "aliases": ["disk forensics", "disk image", "analyze disk",
+                     "partition analysis", "drive analysis"],
+        "related_searches": ["forensics", "file recovery",
+                             "memory forensics"],
+    },
+
+    # ── Reverse Engineering ───────────────────────────────────────────
+    "reverse engineering": {
+        "aliases": ["reverse engineer", "disassemble", "decompile",
+                     "binary analysis", "malware analysis", "re"],
+        "related_searches": ["forensics", "debugging", "exploit development",
+                             "buffer overflow"],
+    },
+    "debugging": {
+        "aliases": ["debug", "debugger", "breakpoint", "step through",
+                     "trace", "analyze crash"],
+        "related_searches": ["reverse engineering", "exploit development",
+                             "system monitoring"],
+    },
+    "exploit development": {
+        "aliases": ["exploit dev", "buffer overflow", "bof", "rop chain",
+                     "shellcode", "write exploit"],
+        "related_searches": ["reverse engineering", "debugging",
+                             "exploitation"],
+    },
+
+    # ── Active Directory & Windows ────────────────────────────────────
+    "active directory": {
+        "aliases": ["ad", "domain", "domain controller", "ad attack",
+                     "windows domain", "ldap", "kerberos", "ad pentest"],
+        "related_searches": ["credential dumping", "lateral movement",
+                             "privilege escalation", "smb",
+                             "password cracking"],
+    },
+    "credential dumping": {
+        "aliases": ["dump passwords", "dump hashes", "extract passwords",
+                     "credential dump", "dump credentials",
+                     "steal passwords", "dump creds", "password dump"],
+        "related_searches": ["password cracking", "active directory",
+                             "post exploitation", "lateral movement"],
+    },
+    "smb": {
+        "aliases": ["windows shares", "samba", "cifs", "file shares",
+                     "network shares", "shared folders"],
+        "related_searches": ["active directory", "enumeration",
+                             "lateral movement", "networking"],
+    },
+
+    # ── System Administration ─────────────────────────────────────────
+    "file management": {
+        "aliases": ["files", "manage files", "file operations",
+                     "copy files", "move files", "delete files",
+                     "file commands"],
+        "related_searches": ["text processing", "permissions", "searching",
+                             "archiving"],
+    },
+    "text processing": {
+        "aliases": ["text edit", "edit text", "process text", "parse text",
+                     "manipulate text", "filter text", "text tools",
+                     "text manipulation"],
+        "related_searches": ["searching", "file management", "scripting"],
+    },
+    "searching": {
+        "aliases": ["search files", "find files", "search text",
+                     "find text", "locate", "find command"],
+        "related_searches": ["file management", "text processing"],
+    },
+    "permissions": {
+        "aliases": ["file permissions", "access control", "ownership",
+                     "acl", "change permissions", "who can access"],
+        "related_searches": ["user management", "file management",
+                             "security", "privilege escalation"],
+    },
+    "user management": {
+        "aliases": ["users", "manage users", "add user", "create user",
+                     "groups", "accounts", "user admin"],
+        "related_searches": ["permissions", "authentication",
+                             "system administration"],
+    },
+    "system monitoring": {
+        "aliases": ["processes", "cpu usage", "memory usage", "system info",
+                     "performance", "task manager", "system stats",
+                     "resource usage"],
+        "related_searches": ["network monitoring", "logs",
+                             "system administration"],
+    },
+    "logs": {
+        "aliases": ["log files", "system logs", "view logs", "check logs",
+                     "error logs", "log viewer", "journalctl"],
+        "related_searches": ["system monitoring", "debugging", "forensics",
+                             "ids"],
+    },
+    "archiving": {
+        "aliases": ["compress", "compression", "archive", "zip", "extract",
+                     "unzip", "tar", "backup", "untar"],
+        "related_searches": ["file management"],
+    },
+    "scripting": {
+        "aliases": ["script", "bash script", "shell script", "automate",
+                     "automation", "programming"],
+        "related_searches": ["text processing", "file management",
+                             "system administration"],
+    },
+    "system administration": {
+        "aliases": ["sysadmin", "admin", "system admin", "manage system",
+                     "server admin"],
+        "related_searches": ["user management", "permissions",
+                             "system monitoring", "logs", "networking",
+                             "file management"],
+    },
+
+    # ── Misc Security Topics ──────────────────────────────────────────
+    "ids": {
+        "aliases": ["intrusion detection", "intrusion prevention", "ips",
+                     "security monitoring", "detect attacks", "nids"],
+        "related_searches": ["firewall", "network monitoring",
+                             "network security", "packet sniffing"],
+    },
+    "social engineering": {
+        "aliases": ["phishing", "social engineer", "credential harvest",
+                     "fake site", "email attack", "pretexting"],
+        "related_searches": ["osint", "exploitation", "email gathering",
+                             "wordlist"],
+    },
+    "vpn": {
+        "aliases": ["virtual private network", "vpn tunnel",
+                     "encrypted tunnel", "vpn connection"],
+        "related_searches": ["tunneling", "networking", "firewall",
+                             "encryption"],
+    },
+    "encryption": {
+        "aliases": ["encrypt", "decrypt", "cipher", "crypto",
+                     "cryptography", "encode", "decode", "ssl", "tls"],
+        "related_searches": ["steganography", "password cracking",
+                             "vpn", "forensics"],
+    },
+    "ctf": {
+        "aliases": ["capture the flag", "ctf challenge", "ctf tools",
+                     "hack the box", "htb", "tryhackme"],
+        "related_searches": ["steganography", "forensics",
+                             "reverse engineering", "exploitation",
+                             "web testing", "password cracking"],
+    },
+    "enumeration": {
+        "aliases": ["enum", "enumerate", "information gathering",
+                     "service enum", "user enum"],
+        "related_searches": ["scanning", "port scanning", "osint",
+                             "active directory", "smb",
+                             "subdomain enumeration"],
+    },
+    "network security": {
+        "aliases": ["secure network", "network defense", "harden network",
+                     "network protection"],
+        "related_searches": ["firewall", "ids", "network monitoring",
+                             "networking", "vpn"],
+    },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PENETRATION TESTING WORKFLOWS
 # Step-by-step command chains that teach methodology, not just tools
 # ─────────────────────────────────────────────────────────────────────────────
