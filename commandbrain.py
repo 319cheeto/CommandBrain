@@ -159,36 +159,207 @@ def setup_database(include_kali=False):
     print()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SEARCH
+# SEARCH — Relevance-scored search with pagination and suggestions
 # ─────────────────────────────────────────────────────────────────────────────
 
-def search_commands(term: str, mode: str = "all") -> List[Tuple]:
-    """Search commands. mode: all | name | category | tags | description"""
+def _score_result(row, term):
+    """Score how relevant a database row is to the search term.
+    Higher score = more relevant. Used to rank results so students see
+    the most useful commands first instead of wading through huge lists."""
+    score = 0
+    term_lower = term.lower().strip()
+    words = [w for w in term_lower.split() if len(w) > 1]
+
+    name        = (row[1] or "").lower()
+    category    = (row[2] or "").lower().replace("-", " ").replace("_", " ")
+    description = (row[3] or "").lower()
+    tags        = (row[8] or "").lower() if len(row) > 8 else ""
+    related     = (row[6] or "").lower() if len(row) > 6 else ""
+    notes       = (row[7] or "").lower() if len(row) > 7 else ""
+
+    # ── Name matching (highest priority) ──────────────────────────────
+    if name == term_lower:
+        score += 100                          # Exact name match
+    elif term_lower in name:
+        score += 60                           # Partial name match
+    elif any(w == name for w in words):
+        score += 55                           # A search word IS the command name
+
+    # ── Category matching ─────────────────────────────────────────────
+    if term_lower == category:
+        score += 45                           # Exact category match
+    elif term_lower in category or category in term_lower:
+        score += 30                           # Partial category match
+    elif any(w in category for w in words):
+        score += 20                           # Word in category
+
+    # ── Core tags (first ~120 chars = original purpose tags) ──────────
+    core_tags = tags[:120]
+    extended_tags = tags[120:]
+
+    if term_lower in core_tags:
+        score += 35                           # Full phrase in core tags
+    elif any(w in core_tags for w in words if len(w) > 2):
+        score += 25                           # Word in core tags
+
+    # ── Description matching ──────────────────────────────────────────
+    if term_lower in description:
+        score += 20
+        # Bonus if term appears early (more likely the primary purpose)
+        pos = description.find(term_lower)
+        if pos < 40:
+            score += 10
+    elif any(w in description for w in words if len(w) > 2):
+        score += 10
+
+    # ── Extended tags (slang/purpose mappings) ────────────────────────
+    if extended_tags:
+        if term_lower in extended_tags:
+            score += 12
+        elif any(w in extended_tags for w in words if len(w) > 2):
+            score += 6
+
+    # ── Notes matching ────────────────────────────────────────────────
+    if term_lower in notes:
+        score += 8
+    elif any(w in notes for w in words if len(w) > 2):
+        score += 4
+
+    # ── Related commands ──────────────────────────────────────────────
+    if term_lower in related:
+        score += 5
+
+    return score
+
+
+def search_commands(term: str, mode: str = "all", page: int = 1,
+                    per_page: int = 10) -> tuple:
+    """Search commands with relevance scoring and pagination.
+
+    Returns: (page_results, total_count, suggestions)
+      - page_results: list of DB rows for the current page
+      - total_count: total number of matching results
+      - suggestions: list of related search term strings
+    """
     conn = _connect()
     cur = conn.cursor()
     p = f"%{term}%"
 
     if mode == "name":
-        cur.execute("SELECT * FROM commands WHERE name LIKE ? ORDER BY name", (p,))
+        cur.execute("SELECT * FROM commands WHERE name LIKE ?", (p,))
+        all_results = cur.fetchall()
     elif mode == "category":
-        cur.execute("SELECT * FROM commands WHERE category LIKE ? ORDER BY name", (p,))
+        cur.execute("SELECT * FROM commands WHERE category LIKE ?", (p,))
+        all_results = cur.fetchall()
     elif mode == "tags":
-        cur.execute("SELECT * FROM commands WHERE tags LIKE ? ORDER BY name", (p,))
+        cur.execute("SELECT * FROM commands WHERE tags LIKE ?", (p,))
+        all_results = cur.fetchall()
     elif mode == "description":
-        cur.execute("SELECT * FROM commands WHERE description LIKE ? OR notes LIKE ? ORDER BY name", (p, p))
+        cur.execute("SELECT * FROM commands WHERE description LIKE ? OR notes LIKE ?", (p, p))
+        all_results = cur.fetchall()
     else:
+        # Search all fields for the full phrase
         cur.execute("""
             SELECT * FROM commands
             WHERE name LIKE ? OR description LIKE ? OR tags LIKE ?
-               OR related_commands LIKE ? OR category LIKE ?
-            ORDER BY
-                CASE WHEN name LIKE ? THEN 1 WHEN tags LIKE ? THEN 2 ELSE 3 END,
-                name
-        """, (p, p, p, p, p, p, p))
+               OR related_commands LIKE ? OR category LIKE ? OR notes LIKE ?
+        """, (p, p, p, p, p, p))
+        all_results = list(cur.fetchall())
+        seen_ids = {r[0] for r in all_results}
 
-    results = cur.fetchall()
+        # For multi-word searches, also find results matching individual words
+        # (catches results that match some but not all words)
+        words = [w for w in term.split() if len(w) > 1]
+        if len(words) > 1:
+            for word in words:
+                wp = f"%{word}%"
+                cur.execute("""
+                    SELECT * FROM commands
+                    WHERE name LIKE ? OR description LIKE ? OR tags LIKE ?
+                       OR category LIKE ?
+                """, (wp, wp, wp, wp))
+                for r in cur.fetchall():
+                    if r[0] not in seen_ids:
+                        all_results.append(r)
+                        seen_ids.add(r[0])
+
     conn.close()
-    return results
+
+    # Score and sort by relevance
+    scored = [(row, _score_result(row, term)) for row in all_results]
+    scored.sort(key=lambda x: (-x[1], x[0][1]))  # Score desc, then name asc
+
+    total = len(scored)
+
+    # Paginate
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_results = [row for row, score in scored[start:end]]
+
+    # Get search suggestions
+    suggestions = _get_search_suggestions(term, all_results)
+
+    return page_results, total, suggestions
+
+
+def _get_search_suggestions(term, all_results):
+    """Generate related search suggestions for the bottom of results.
+    Checks the SEARCH_TAXONOMY first for curated suggestions, then falls back
+    to dynamically generating suggestions from result categories and tags."""
+    try:
+        from data import SEARCH_TAXONOMY
+    except ImportError:
+        SEARCH_TAXONOMY = {}
+
+    term_lower = term.lower().strip()
+    suggestions = []
+
+    # 1. Check taxonomy for exact match (term or alias)
+    for key, entry in SEARCH_TAXONOMY.items():
+        aliases = [a.lower() for a in entry.get("aliases", [])]
+        if term_lower == key.lower() or term_lower in aliases:
+            suggestions = list(entry.get("related_searches", []))
+            break
+
+    # 2. If no exact match, check for partial/fuzzy taxonomy matches
+    if not suggestions:
+        partial = []
+        for key, entry in SEARCH_TAXONOMY.items():
+            aliases = [a.lower() for a in entry.get("aliases", [])]
+            all_terms = [key.lower()] + aliases
+            if any(term_lower in t or t in term_lower for t in all_terms):
+                for s in entry.get("related_searches", []):
+                    if s.lower() != term_lower and s not in partial:
+                        partial.append(s)
+                if len(partial) >= 8:
+                    break
+        suggestions = partial
+
+    # 3. If still nothing, generate from result categories/tags dynamically
+    if not suggestions and all_results:
+        cats = set()
+        tag_words = set()
+        for r in all_results[:20]:
+            cat = (r[2] or "").replace("-", " ").replace("_", " ").lower()
+            if cat and cat != term_lower:
+                cats.add(cat)
+            raw_tags = (r[8] or "").split(",") if len(r) > 8 else []
+            for t in raw_tags[:5]:
+                word = t.strip().lower()
+                if word and word != term_lower and len(word) > 3:
+                    tag_words.add(word)
+        suggestions = list(cats)[:4] + list(tag_words - cats)[:4]
+
+    # Deduplicate and remove the search term itself
+    seen = set()
+    clean = []
+    for s in suggestions:
+        sl = s.lower()
+        if sl != term_lower and sl not in seen:
+            seen.add(sl)
+            clean.append(s)
+
+    return clean[:8]
 
 
 def _suggest(term: str, limit: int = 5) -> List[str]:
@@ -209,37 +380,67 @@ def _print_no_results(term: str):
     print(f"{C.YELLOW}No commands found for '{term}'.{C.END}")
     if not term:
         return
+    # Show fuzzy name suggestions
     suggestions = _suggest(term)
-    if not suggestions:
-        return
-    print(f"\n{C.CYAN}Did you mean:{C.END}")
-    conn = _connect()
-    cur = conn.cursor()
-    for cmd in suggestions:
-        cur.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
-        row = cur.fetchone()
-        if row:
-            desc = row[0][:57] + "..." if len(row[0]) > 60 else row[0]
-            print(f"  {C.GREEN}{cmd}{C.END} - {desc}")
-    conn.close()
-    print(f"\n{C.BOLD}Try:{C.END} cb {suggestions[0]}")
+    if suggestions:
+        print(f"\n{C.CYAN}Did you mean:{C.END}")
+        conn = _connect()
+        cur = conn.cursor()
+        for cmd in suggestions:
+            cur.execute("SELECT description FROM commands WHERE name = ?", (cmd,))
+            row = cur.fetchone()
+            if row:
+                desc = row[0][:57] + "..." if len(row[0]) > 60 else row[0]
+                print(f"  {C.GREEN}{cmd}{C.END} - {desc}")
+        conn.close()
+        print(f"\n{C.BOLD}Try:{C.END} cb {suggestions[0]}")
+    # Also show taxonomy-based suggestions even when no results
+    tax_suggestions = _get_search_suggestions(term, [])
+    if tax_suggestions:
+        print(f"\n{C.CYAN}Related searches:{C.END} {', '.join(tax_suggestions)}")
 
 
-def display_short(results: List[Tuple], term: str = ""):
+def _print_search_footer(total, page, per_page, suggestions, term):
+    """Print pagination info and 'Also try' related search suggestions."""
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    # Pagination info
+    start = (page - 1) * per_page + 1
+    end = min(page * per_page, total)
+    if total > per_page:
+        print(f"{C.BOLD}Showing {start}-{end} of {total} results{C.END}", end="")
+        if page < total_pages:
+            print(f"  {C.CYAN}(next: cb {term} --page {page + 1}){C.END}")
+        else:
+            print()
+    elif total > 0:
+        print(f"{C.BOLD}{total} result(s){C.END}")
+
+    # Related search suggestions
+    if suggestions:
+        suggestion_strs = [f"{C.GREEN}{s}{C.END}" for s in suggestions]
+        print(f"\n{C.CYAN}Also try:{C.END} {', '.join(suggestion_strs)}")
+    print()
+
+
+def display_short(results: List[Tuple], term: str = "", total: int = 0,
+                  page: int = 1, per_page: int = 10, suggestions=None):
     """List view: name, category, one-liner."""
     if not results:
         return _print_no_results(term)
-    print(f"\n{C.BOLD}Found {len(results)} command(s):{C.END}\n")
+    print(f"\n{C.BOLD}Found {total} command(s):{C.END}\n")
     for r in results:
         print(f"{C.CYAN}{C.BOLD}{r[1]}{C.END} {C.YELLOW}[{r[2]}]{C.END}")
         print(f"  {r[3]}\n")
+    _print_search_footer(total, page, per_page, suggestions or [], term)
 
 
-def display_detailed(results: List[Tuple], term: str = ""):
+def display_detailed(results: List[Tuple], term: str = "", total: int = 0,
+                     page: int = 1, per_page: int = 10, suggestions=None):
     """Full info: description, usage, examples, notes, tags."""
     if not results:
         return _print_no_results(term)
-    print(f"\n{C.BOLD}Found {len(results)} command(s):{C.END}\n")
+    print(f"\n{C.BOLD}Found {total} command(s):{C.END}\n")
     for i, r in enumerate(results, 1):
         if i > 1:
             print(f"\n{C.BLUE}{'─' * 70}{C.END}\n")
@@ -258,13 +459,16 @@ def display_detailed(results: List[Tuple], term: str = ""):
             print(f"\n{C.BOLD}Notes:{C.END}\n  {notes}")
         if tags:
             print(f"\n{C.BOLD}Tags:{C.END} {tags}")
+    print()
+    _print_search_footer(total, page, per_page, suggestions or [], term)
 
 
-def display_examples(results: List[Tuple], term: str = ""):
+def display_examples(results: List[Tuple], term: str = "", total: int = 0,
+                     page: int = 1, per_page: int = 10, suggestions=None):
     """Quick-reference: just name + examples."""
     if not results:
         return _print_no_results(term)
-    print(f"\n{C.BOLD}Examples for {len(results)} command(s):{C.END}\n")
+    print(f"\n{C.BOLD}Examples for {total} command(s):{C.END}\n")
     for i, r in enumerate(results, 1):
         if i > 1:
             print(f"{C.BLUE}{'─' * 50}{C.END}\n")
@@ -278,6 +482,7 @@ def display_examples(results: List[Tuple], term: str = ""):
         else:
             print(f"  {C.YELLOW}(No examples available){C.END}")
         print()
+    _print_search_footer(total, page, per_page, suggestions or [], term)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CATEGORIES & STATS
@@ -718,6 +923,8 @@ def main():
 Examples:
   cb ssh                     Search for ssh
   cb password cracking       Search by purpose/task
+  cb networking              Top 10 networking tools + related searches
+  cb networking --page 2     Page 2 of networking results
   cb -d grep                 Detailed view
   cb -e ssh                  Examples only (quick reference)
   cb --compare grep egrep    Compare two commands
@@ -751,6 +958,10 @@ Examples:
     p.add_argument('-e', '--examples', action='store_true', help='Examples only')
     p.add_argument('-t', '--type', choices=['all','name','category','tags','description'],
                    default='all', help='Search field (default: all)')
+    p.add_argument('--page', '-p', type=int, default=1,
+                   help='Page number for search results (default: 1)')
+    p.add_argument('--per-page', type=int, default=10,
+                   help='Results per page (default: 10, max: 25)')
     p.add_argument('--no-color', action='store_true', help='Disable colored output')
 
     args = p.parse_args()
@@ -760,6 +971,9 @@ Examples:
         for attr in vars(Colors):
             if not attr.startswith('_'):
                 setattr(Colors, attr, '')
+
+    # Clamp per_page between 5 and 25
+    per_page = max(5, min(25, args.per_page))
 
     # Route to the right action
     if args.setup:
@@ -786,13 +1000,14 @@ Examples:
         import_from_file(args.import_file)
     elif args.query:
         term = ' '.join(args.query)
-        results = search_commands(term, args.type)
+        results, total, suggestions = search_commands(
+            term, args.type, page=args.page, per_page=per_page)
         if args.examples:
-            display_examples(results, term)
+            display_examples(results, term, total, args.page, per_page, suggestions)
         elif args.detailed:
-            display_detailed(results, term)
+            display_detailed(results, term, total, args.page, per_page, suggestions)
         else:
-            display_short(results, term)
+            display_short(results, term, total, args.page, per_page, suggestions)
     else:
         p.print_help()
 
